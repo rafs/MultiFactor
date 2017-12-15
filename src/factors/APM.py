@@ -18,6 +18,7 @@ import statsmodels.api as sm
 import datetime
 import logging
 from multiprocessing import Pool, Manager
+import time
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
@@ -43,13 +44,66 @@ class APM(Factor):
         """
         # 1.取得过去40个交易日序列，交易日按降序排列
         calc_date = Utils.to_date(calc_date)
-        trading_days = Utils.get_trading_days(end=calc_date, ndays=40, ascending=False)
+        trading_days = Utils.get_trading_days(end=calc_date, ndays=40, ascending=True)
+
+
+
         # 2.取得个股及指数过去__days+1个交易日每个交易日的开盘价、中午收盘价和当天收盘价
         #   开盘价为09:31分钟线的开盘价，中午收盘价为11:30分钟线的收盘价，当天收盘价为15:00分钟线的收盘价
         #   返回的数据格式为DataFrame，columns=['date','open','mid_close','close']，按日期升序排列
-        secu_mkt_data = DataFrame()
-        index_mkt_data = DataFrame()
-        mkt_data_header = ['date', 'open', 'mid_close', 'close']
+        # secu_mkt_data = DataFrame()
+        # index_mkt_data = DataFrame()
+        # mkt_data_header = ['date', 'open', 'mid_close', 'close']
+        # k = 0
+        # for trading_day in trading_days:
+        #     df_1min_data = Utils.get_min_mkt(Utils.code_to_symbol(code), trading_day, fq=True)
+        #     if df_1min_data is not None:
+        #         str_date = Utils.datetimelike_to_str(trading_day)
+        #         fopen = df_1min_data[df_1min_data.datetime == '%s 09:31:00' % str_date].iloc[0].open
+        #         fmid_close = df_1min_data[df_1min_data.datetime == '%s 11:30:00' % str_date].iloc[0].close
+        #         fclose = df_1min_data[df_1min_data.datetime == '%s 15:00:00' % str_date].iloc[0].close
+        #         secu_mkt_data = secu_mkt_data.append(
+        #             Series([str_date, fopen, fmid_close, fclose], index=mkt_data_header), ignore_index=True)
+        #
+        #         df_1min_data = Utils.get_min_mkt(factor_ct.APM_CT.index_code, trading_day, index=True, fq=True)
+        #         fopen = df_1min_data[df_1min_data.datetime == '%s 09:31:00' % str_date].iloc[0].open
+        #         fmid_close = df_1min_data[df_1min_data.datetime == '%s 11:30:00' % str_date].iloc[0].close
+        #         fclose = df_1min_data[df_1min_data.datetime == '%s 15:00:00' % str_date].iloc[0].close
+        #         index_mkt_data = index_mkt_data.append(
+        #             Series([str_date, fopen, fmid_close, fclose], index=mkt_data_header), ignore_index=True)
+        #         k += 1
+        #         if k > cls.__days:
+        #             break
+        # if k <= cls.__days:
+        #     return None
+        # secu_mkt_data = secu_mkt_data.sort_values(by='date')
+        # secu_mkt_data = secu_mkt_data.reset_index(drop=True)
+        # index_mkt_data = index_mkt_data.sort_values(by='date')
+        # index_mkt_data = index_mkt_data.reset_index(drop=True)
+        # #  3.计算个股及指数的上午收益率数组r_t^{am},R_t^{am}和下午收益率数组r_t^{pm},R_t^{pm}，并拼接为一个数组
+        # #    拼接后的收益率数组，上半部分为r_t^{am} or R_t^{am}，下半部分为r_t^{pm} or R_t^{pm}
+        # r_am_array = np.zeros((cls.__days, 1))
+        # r_pm_array = np.zeros((cls.__days, 1))
+        # for ind in secu_mkt_data.index[1:]:
+        #     r_am_array[ind-1, 0] = secu_mkt_data.loc[ind, 'mid_close'] / secu_mkt_data.loc[ind-1, 'close'] - 1.0
+        #     r_pm_array[ind-1, 0] = secu_mkt_data.loc[ind, 'close'] / secu_mkt_data.loc[ind, 'mid_close'] - 1.0
+        # r_apm_array = np.concatenate((r_am_array, r_pm_array), axis=0)
+        #
+        # R_am_array = np.zeros((cls.__days, 1))
+        # R_pm_array = np.zeros((cls.__days, 1))
+        # for ind in index_mkt_data.index[1:]:
+        #     R_am_array[ind-1, 0] = index_mkt_data.loc[ind, 'mid_close'] / index_mkt_data.loc[ind-1, 'close'] - 1.0
+        #     R_pm_array[ind-1, 0] = index_mkt_data.loc[ind, 'close'] / index_mkt_data.loc[ind, 'mid_close'] - 1.0
+        # R_apm_array = np.concatenate((R_am_array, R_pm_array), axis=0)
+
+
+
+
+        # 遍历交易日序列，计算个股及指数的上午收益率(r_am_array,R_am_array)和下午收益率序列(r_pm_array,R_pm_array)
+        r_am_array = np.zeros((cls.__days, 1))
+        r_pm_array = np.zeros((cls.__days, 1))
+        R_am_array = np.zeros((cls.__days, 1))
+        R_pm_array = np.zeros((cls.__days, 1))
         k = 0
         for trading_day in trading_days:
             df_1min_data = Utils.get_min_mkt(Utils.code_to_symbol(code), trading_day, fq=True)
@@ -58,39 +112,26 @@ class APM(Factor):
                 fopen = df_1min_data[df_1min_data.datetime == '%s 09:31:00' % str_date].iloc[0].open
                 fmid_close = df_1min_data[df_1min_data.datetime == '%s 11:30:00' % str_date].iloc[0].close
                 fclose = df_1min_data[df_1min_data.datetime == '%s 15:00:00' % str_date].iloc[0].close
-                secu_mkt_data = secu_mkt_data.append(
-                    Series([str_date, fopen, fmid_close, fclose], index=mkt_data_header), ignore_index=True)
+                r_am_array[k, 0] = fmid_close / fopen  - 1.0
+                r_pm_array[k, 0] = fclose / fmid_close - 1.0
 
                 df_1min_data = Utils.get_min_mkt(factor_ct.APM_CT.index_code, trading_day, index=True, fq=True)
                 fopen = df_1min_data[df_1min_data.datetime == '%s 09:31:00' % str_date].iloc[0].open
                 fmid_close = df_1min_data[df_1min_data.datetime == '%s 11:30:00' % str_date].iloc[0].close
                 fclose = df_1min_data[df_1min_data.datetime == '%s 15:00:00' % str_date].iloc[0].close
-                index_mkt_data = index_mkt_data.append(
-                    Series([str_date, fopen, fmid_close, fclose], index=mkt_data_header), ignore_index=True)
-                k += 1
-                if k > cls.__days:
-                    break
-        if k <= cls.__days:
-            return None
-        secu_mkt_data = secu_mkt_data.sort_values(by='date')
-        secu_mkt_data = secu_mkt_data.reset_index(drop=True)
-        index_mkt_data = index_mkt_data.sort_values(by='date')
-        index_mkt_data = index_mkt_data.reset_index(drop=True)
-        #  3.计算个股及指数的上午收益率数组r_t^{am},R_t^{am}和下午收益率数组r_t^{pm},R_t^{pm}，并拼接为一个数组
-        #    拼接后的收益率数组，上半部分为r_t^{am} or R_t^{am}，下半部分为r_t^{pm} or R_t^{pm}
-        r_am_array = np.zeros((cls.__days, 1))
-        r_pm_array = np.zeros((cls.__days, 1))
-        for ind in secu_mkt_data.index[1:]:
-            r_am_array[ind-1, 0] = secu_mkt_data.loc[ind, 'mid_close'] / secu_mkt_data.loc[ind-1, 'close'] - 1.0
-            r_pm_array[ind-1, 0] = secu_mkt_data.loc[ind, 'close'] / secu_mkt_data.loc[ind, 'mid_close'] - 1.0
-        r_apm_array = np.concatenate((r_am_array, r_pm_array), axis=0)
+                R_am_array[k, 0] = fmid_close / fopen - 1.0
+                R_pm_array[k, 0] = fclose / fmid_close - 1.0
 
-        R_am_array = np.zeros((cls.__days, 1))
-        R_pm_array = np.zeros((cls.__days, 1))
-        for ind in index_mkt_data.index[1:]:
-            R_am_array[ind-1, 0] = index_mkt_data.loc[ind, 'mid_close'] / index_mkt_data.loc[ind-1, 'close'] - 1.0
-            R_pm_array[ind-1, 0] = index_mkt_data.loc[ind, 'close'] / index_mkt_data.loc[ind, 'mid_close'] - 1.0
+                k += 1
+                if k == cls.__days:
+                    break
+        if k < cls.__days:
+            return None
+        r_apm_array = np.concatenate((r_am_array, r_pm_array), axis=0)
         R_apm_array = np.concatenate((R_am_array, R_pm_array), axis=0)
+
+
+
         # 4.个股收益率数组相对于指数收益率进行线性回归
         #   将指数收益率数组添加常数项
         R_apm_array = sm.add_constant(R_apm_array)
@@ -181,6 +222,7 @@ class APM(Factor):
                 symbol_lst.append(apm_value[0])
                 stat_lst.append(apm_value[1])
                 ret20_lst.append(apm_value[2])
+
             assert len(stat_lst) == len(ret20_lst)
             assert len(stat_lst) == len(symbol_lst)
 
@@ -197,6 +239,9 @@ class APM(Factor):
             dict_apm = {'ID': symbol_lst, 'factorvalue': apm_lst}
             if save:
                 Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_apm)
+            # 休息300秒
+            logging.info('Suspended for 300s.')
+            time.sleep(300)
         return dict_apm
 
 
@@ -215,4 +260,4 @@ def apm_backtest(start, end):
 
 if __name__ == '__main__':
     # pass
-    APM.calc_factor_loading('2012-12-31', month_end=True, save=True)
+    APM.calc_factor_loading(start_date='2012-12-31', end_date='2013-12-31',month_end=True, save=True)

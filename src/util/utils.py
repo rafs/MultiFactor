@@ -13,9 +13,13 @@ from pandas import DataFrame
 import tushare as ts
 import datetime
 import shelve
+from src.util.Cache import Cache
 
 
 class Utils(object):
+
+    _DataCache = Cache(500)    # 数据缓存
+
     @classmethod
     def calc_interval_ret(cls, secu_code, start=None, end=None, ndays=None):
         """
@@ -251,10 +255,13 @@ class Utils(object):
             mkt_file_path = os.path.join(ct.DB_PATH, ct.MKT_MIN_FQ, str_date, '%s.csv' % symbol)
         else:
             mkt_file_path = os.path.join(ct.DB_PATH, ct.MKT_MIN_NOFQ, str_date, '%s.csv' % symbol)
-        if os.path.isfile(mkt_file_path):
+        key = '%s_1min_mkt_%s' % (symbol, cls.to_date(trade_date).strftime('%Y%m%d'))
+        df_mkt_min = cls._DataCache.get(key)
+        if df_mkt_min is None and os.path.isfile(mkt_file_path):
             df_mkt_min = pd.read_csv(mkt_file_path, names=ct.MKT_MIN_FQ_HEADER, skiprows=[0])
-        else:
-            df_mkt_min = None
+            cls._DataCache.set(key, df_mkt_min)
+        # else:
+        #     df_mkt_min = None
         return df_mkt_min
 
     @classmethod

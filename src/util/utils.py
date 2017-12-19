@@ -8,6 +8,7 @@
 from src.util import cons as ct
 import os
 import pandas as pd
+import numpy as np
 from pandas import Series
 from pandas import DataFrame
 import tushare as ts
@@ -323,6 +324,41 @@ class Utils(object):
         else:
             df_factor_loading = DataFrame()
         return df_factor_loading
+
+    @classmethod
+    def clean_extreme_value(cls, arr_data, method='MAD'):
+        """
+        对数据进行去极值处理
+        :param arr_data: np.array
+            需要进行去极值的原始数据，数组的每一列各自进行去极值操作
+        :param method: 去极值算法
+        :return: np.array
+            去极值处理后的数据
+        """
+        raw_data = arr_data.copy()
+        m = np.median(raw_data, axis=0)     # 原始数据的中位数
+        mad = np.median(np.fabs(raw_data - m), axis=0)
+        fupper = m + mad * ct.CLEAN_EXTREME_VALUE_MULTI_CONST
+        flower = m - mad - ct.CLEAN_EXTREME_VALUE_MULTI_CONST
+        for k in range(raw_data.shape[1]):
+            if method == 'MAD':
+                raw_data[:, k][raw_data[:, k] > fupper[k]] = fupper[k]
+                raw_data[:, k][raw_data[:, k] < flower[k]] = flower[k]
+        return raw_data
+
+    @classmethod
+    def normalize_data(cls, arr_data):
+        """
+        对数据进行标准化
+        :param arr_data: np.array
+            需要进行标准化处理的原始数据
+        :return: np.array
+            标准化处理后的数据
+        """
+        raw_data = arr_data.copy()
+        u = np.mean(raw_data, axis=0)
+        s = np.std(raw_data, axis=0)
+        return (raw_data - u)/s
 
     @classmethod
     def datetimelike_to_str(cls, datetime_like, dash=True):

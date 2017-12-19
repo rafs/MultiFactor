@@ -28,6 +28,9 @@ FACTOR_LOADING_PERSISTENCE_TYPE='shelve,csv'
 # 读取因子载荷采用的持久化形式
 USING_PERSISTENCE_TYPE='shelve'
 
+# 去极值方法中mad的乘数
+CLEAN_EXTREME_VALUE_MULTI_CONST=5.2
+
 
 if __name__ == '__main__':
     pass

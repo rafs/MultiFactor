@@ -191,7 +191,7 @@ class APM(Factor):
         # 2.遍历交易日序列，计算APM因子载荷
         dict_apm = None
         for calc_date in trading_days_series:
-            dict_apm = {'ID': [], 'factorvalue': []}
+            dict_apm = {'date':[] ,'id': [], 'factorvalue': []}
             if month_end and (not Utils.is_month_end(calc_date)):
                 continue
             # 2.1.遍历个股，计算个股APM.stat统计量，过去20日收益率，分别放进stat_lst,ret20_lst列表中
@@ -210,7 +210,7 @@ class APM(Factor):
             #         symbol_lst.append(Utils.code_to_symbol(stock_info.symbol))
             #         logging.info('APM of %s = %f' % (stock_info.symbol, stat_i))
 
-            # 采用多进程平行计算
+            # 采用多进程并行计算
             q = Manager().Queue()
             p = Pool(4)     # 最多同时开启4个进程
             for _, stock_info in stock_basics.iterrows():
@@ -228,15 +228,22 @@ class APM(Factor):
 
             # 2.2.将统计量stat对动量因子ret20j进行截面回归：stat_j = \beta * Ret20_j + \epsilon_j
             #     残差向量即为对应个股的APM因子
+            # 截面回归之前，先对stat统计量和动量因子进行去极值和标准化处理
             stat_arr = np.array(stat_lst).reshape((len(stat_lst), 1))
             ret20_arr = np.array(ret20_lst).reshape((len(ret20_lst), 1))
+            stat_arr = Utils.clean_extreme_value(stat_arr)
+            stat_arr = Utils.normalize_data(stat_arr)
+            ret20_arr = Utils.clean_extreme_value(ret20_arr)
+            ret20_arr = Utils.normalize_data(ret20_arr)
+            # 回归分析
             ret20_arr = sm.add_constant(ret20_arr)
             apm_model = sm.OLS(stat_arr, ret20_arr)
             apm_result = apm_model.fit()
             apm_lst = list(np.around(apm_result.resid, 6))  # amp因子载荷精确到6位小数
             assert len(apm_lst) == len(symbol_lst)
             # 2.3.构造APM因子字典，并持久化
-            dict_apm = {'ID': symbol_lst, 'factorvalue': apm_lst}
+            date_label = Utils.get_trading_days(calc_date, ndays=2)[1]
+            dict_apm = {'date': [date_label]*len(symbol_lst) ,'id': symbol_lst, 'factorvalue': apm_lst}
             if save:
                 Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_apm)
             # 休息300秒

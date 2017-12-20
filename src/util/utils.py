@@ -165,7 +165,6 @@ class Utils(object):
             else:
                 return True
 
-
     @classmethod
     def get_secu_daily_mkt(cls, secu_code, start, end=None, fq=False, range_lookup=False):
         """
@@ -386,8 +385,6 @@ class Utils(object):
             return _code_to_symbol(code)
         else:
             return _code_to_index_symbol(code)
-
-    @classmethod
 
     @classmethod
     # 转换为适用于tushare格式的代码

@@ -44,7 +44,7 @@ class APM(Factor):
         """
         # 1.取得过去40个交易日序列，交易日按降序排列
         calc_date = Utils.to_date(calc_date)
-        trading_days = Utils.get_trading_days(end=calc_date, ndays=40, ascending=True)
+        trading_days = Utils.get_trading_days(end=calc_date, ndays=40, ascending=False)
 
 
 
@@ -147,7 +147,11 @@ class APM(Factor):
         delta_array = resid_array[:cls.__days] - resid_array[cls.__days:]   # 上午与 下午的残差差值
         delta_avg = np.mean(delta_array)    # 残差差值的均值
         delta_std = np.std(delta_array)     # 残差差值的标准差
+        # 如果残差差值的标准差接近于0，返回None
+        if np.fabs(delta_std) < 0.0001:
+            return None
         stat = delta_avg / delta_std / np.sqrt(cls.__days)
+        # logging.info('%s, stat = %.6f' % (code, stat))
         return stat
 
     @classmethod
@@ -236,7 +240,7 @@ class APM(Factor):
             ret20_arr = Utils.clean_extreme_value(ret20_arr)
             ret20_arr = Utils.normalize_data(ret20_arr)
             # 回归分析
-            ret20_arr = sm.add_constant(ret20_arr)
+            # ret20_arr = sm.add_constant(ret20_arr)
             apm_model = sm.OLS(stat_arr, ret20_arr)
             apm_result = apm_model.fit()
             apm_lst = list(np.around(apm_result.resid, 6))  # amp因子载荷精确到6位小数
@@ -267,4 +271,6 @@ def apm_backtest(start, end):
 
 if __name__ == '__main__':
     # pass
+    # APM._calc_factor_loading('SZ002558','2015-12-31')
+    # APM.calc_factor_loading('2015-12-31')
     APM.calc_factor_loading(start_date='2012-12-31', end_date='2013-12-31',month_end=True, save=True)

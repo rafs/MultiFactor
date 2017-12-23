@@ -14,8 +14,17 @@ from pandas import DataFrame
 import tushare as ts
 import datetime
 import shelve
+from enum import Enum, auto
 from src.util.Cache import Cache
 
+class SecuTradingStatus(Enum):
+    """
+    个股的交易状态：正常、停牌、涨停、跌停
+    """
+    Normal = auto()         # 正常交易
+    Suspend = auto()        # 停牌
+    LimitUp = auto()        # 涨停
+    LimitDown = auto()      # 跌停
 
 class Utils(object):
 
@@ -140,7 +149,7 @@ class Utils(object):
         elif end is not None:
             trading_days = Utils.utils_trading_days[Utils.utils_trading_days <= end]
         elif ndays is not None:
-            trading_days = Utils.utils_trading_days[-ndays:]
+            trading_days = Utils.utils_trading_days.iloc[-ndays:]
         else:
             trading_days = Utils.utils_trading_days
         trading_days = trading_days.reset_index(drop=True)
@@ -149,9 +158,26 @@ class Utils(object):
         return trading_days
 
     @classmethod
+    def get_prev_n_day(cls, end, ndays=1):
+        """
+        取得截止日期前的第几个交易日
+        :param end: datetime-like, str
+            截止日期
+        :param ndays: int
+            天数
+        :return: pandas.Timestamp
+        """
+        end = cls.to_date(end)
+        trading_days = cls.get_trading_days(end=end)
+        if trading_days.iloc[-1] == end:
+            return trading_days.iloc[-(ndays+1)]
+        else:
+            return trading_days.iloc[-ndays]
+
+    @classmethod
     def is_month_end(cls, trading_day):
         """
-        是否时月末的交易日
+        是否是月末的交易日
         :param trading_day: datetime-like, str
         :return: bool
         """
@@ -161,6 +187,23 @@ class Utils(object):
             return False
         else:
             if trading_day.month == trading_days[1].month:
+                return False
+            else:
+                return True
+
+    @classmethod
+    def is_month_start(cls, trading_day):
+        """
+        是否是月初的交易日
+        :param trading_day: datetime-like, str
+        :return:
+        """
+        trading_day = cls.to_date(trading_day)
+        trading_days = cls.get_trading_days(end=trading_day, ndays=2)
+        if trading_day != trading_days[1]:
+            return False
+        else:
+            if trading_day.month == trading_days[0].month:
                 return False
             else:
                 return True
@@ -265,6 +308,51 @@ class Utils(object):
         return df_mkt_min
 
     @classmethod
+    def trading_status(cls, code, trading_day):
+        """
+        返回个股在指定交易日的交易状态：正常、停牌、涨停、跌停
+        Parameters
+        --------
+        :param code: str
+            个股代码，如SH600000
+        :param trading_day: datetime-like, str
+            交易日
+        :return:
+            正常交易: SecuTradingStatus.Normal
+            停牌：SecuTradingStatus.Suspend
+            涨停：SecuTradingStatus.LimitUp
+            跌停：SecuTradingStatus.LimitDown
+        """
+        symbol = cls.code_to_symbol(code)
+        str_date = cls.datetimelike_to_str(cls.to_date(trading_day), dash=True)
+        file_path = '%s.csv' % os.path.join(ct.DB_PATH, ct.MKT_DAILY_NOFQ, symbol)
+        df_daily_mkt = pd.read_csv(file_path, names=ct.MKT_DAILY_NOFQ_HEADER, header=0)
+        df_daily_mkt = df_daily_mkt[df_daily_mkt.date <= str_date].iloc[-2:]
+        if len(df_daily_mkt) > 0:
+            if df_daily_mkt.iloc[-1].date != str_date:
+                return SecuTradingStatus.Suspend
+            else:
+                if abs(df_daily_mkt.iloc[-1].high - df_daily_mkt.iloc[-1].low) > 0.01:
+                    return SecuTradingStatus.Normal
+                else:
+                    if len(df_daily_mkt) == 2:
+                        if df_daily_mkt.iloc[-1].low > df_daily_mkt.iloc[-2].close * 1.099:
+                            return SecuTradingStatus.LimitUp
+                        elif df_daily_mkt.iloc[-1].high < df_daily_mkt.iloc[-2].close * 0.901:
+                            return SecuTradingStatus.LimitDown
+                        else:
+                            return SecuTradingStatus.Normal
+                    else:
+                        if df_daily_mkt.iloc[-1].low > df_daily_mkt.iloc[-1].open * 1.099:
+                            return SecuTradingStatus.LimitUp
+                        elif df_daily_mkt.iloc[-1].high < df_daily_mkt.iloc[-1].open * 0.901:
+                            return SecuTradingStatus.LimitDown
+                        else:
+                            return SecuTradingStatus.Normal
+        else:
+            return SecuTradingStatus.Suspend
+
+    @classmethod
     def factor_loading_persistent(cls, db_file, str_key, dict_factor_loading):
         """
         持久化因子载荷
@@ -312,14 +400,14 @@ class Utils(object):
             db = shelve.open(db_file, flag='c', protocol=None, writeback=False)
             try:
                 dict_factor_loading = db[str_key]
-                df_factor_loading = DataFrame(dict_factor_loading).set_index('ID')
+                df_factor_loading = DataFrame(dict_factor_loading)
             except KeyError:
                 df_factor_loading = DataFrame()
             finally:
                 db.close()
         elif using_type == 'csv':
-            db_file &= '_%s.csv' % str_key
-            df_factor_loading = pd.read_csv(db_file, header=0, index_col=0)
+            db_file += '_%s.csv' % str_key
+            df_factor_loading = pd.read_csv(db_file, header=0)
         else:
             df_factor_loading = DataFrame()
         return df_factor_loading

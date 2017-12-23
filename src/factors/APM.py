@@ -8,7 +8,7 @@
 
 from src.factors.factor import Factor
 import src.factors.cons as factor_ct
-from src.util.utils import Utils
+from src.util.utils import Utils, SecuTradingStatus
 from src.util.dataapi.CDataHandler import CDataHandler
 import os
 import numpy as np
@@ -45,8 +45,6 @@ class APM(Factor):
         # 1.取得过去40个交易日序列，交易日按降序排列
         calc_date = Utils.to_date(calc_date)
         trading_days = Utils.get_trading_days(end=calc_date, ndays=40, ascending=False)
-
-
 
         # 2.取得个股及指数过去__days+1个交易日每个交易日的开盘价、中午收盘价和当天收盘价
         #   开盘价为09:31分钟线的开盘价，中午收盘价为11:30分钟线的收盘价，当天收盘价为15:00分钟线的收盘价
@@ -96,9 +94,6 @@ class APM(Factor):
         #     R_pm_array[ind-1, 0] = index_mkt_data.loc[ind, 'close'] / index_mkt_data.loc[ind, 'mid_close'] - 1.0
         # R_apm_array = np.concatenate((R_am_array, R_pm_array), axis=0)
 
-
-
-
         # 遍历交易日序列，计算个股及指数的上午收益率(r_am_array,R_am_array)和下午收益率序列(r_pm_array,R_pm_array)
         r_am_array = np.zeros((cls.__days, 1))
         r_pm_array = np.zeros((cls.__days, 1))
@@ -112,7 +107,7 @@ class APM(Factor):
                 fopen = df_1min_data[df_1min_data.datetime == '%s 09:31:00' % str_date].iloc[0].open
                 fmid_close = df_1min_data[df_1min_data.datetime == '%s 11:30:00' % str_date].iloc[0].close
                 fclose = df_1min_data[df_1min_data.datetime == '%s 15:00:00' % str_date].iloc[0].close
-                r_am_array[k, 0] = fmid_close / fopen  - 1.0
+                r_am_array[k, 0] = fmid_close / fopen - 1.0
                 r_pm_array[k, 0] = fclose / fmid_close - 1.0
 
                 df_1min_data = Utils.get_min_mkt(factor_ct.APM_CT.index_code, trading_day, index=True, fq=True)
@@ -129,8 +124,6 @@ class APM(Factor):
             return None
         r_apm_array = np.concatenate((r_am_array, r_pm_array), axis=0)
         R_apm_array = np.concatenate((R_am_array, R_pm_array), axis=0)
-
-
 
         # 4.个股收益率数组相对于指数收益率进行线性回归
         #   将指数收益率数组添加常数项
@@ -163,7 +156,7 @@ class APM(Factor):
             q.put((Utils.code_to_symbol(code), stat, ret20))
 
     @classmethod
-    def calc_factor_loading(cls, start_date, end_date=None, month_end = True, save=False):
+    def calc_factor_loading(cls, start_date, end_date=None, month_end=True, save=False):
         """
         计算指定日期的样本个股的因子载荷，并保存至因子数据库
         Parameters
@@ -195,7 +188,7 @@ class APM(Factor):
         # 2.遍历交易日序列，计算APM因子载荷
         dict_apm = None
         for calc_date in trading_days_series:
-            dict_apm = {'date':[] ,'id': [], 'factorvalue': []}
+            dict_apm = {'date': [], 'id': [], 'factorvalue': []}
             if month_end and (not Utils.is_month_end(calc_date)):
                 continue
             # 2.1.遍历个股，计算个股APM.stat统计量，过去20日收益率，分别放进stat_lst,ret20_lst列表中
@@ -247,7 +240,7 @@ class APM(Factor):
             assert len(apm_lst) == len(symbol_lst)
             # 2.3.构造APM因子字典，并持久化
             date_label = Utils.get_trading_days(calc_date, ndays=2)[1]
-            dict_apm = {'date': [date_label]*len(symbol_lst) ,'id': symbol_lst, 'factorvalue': apm_lst}
+            dict_apm = {'date': [date_label]*len(symbol_lst), 'id': symbol_lst, 'factorvalue': apm_lst}
             if save:
                 Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_apm)
             # 休息300秒
@@ -267,10 +260,79 @@ def apm_backtest(start, end):
         回测结束日期，格式：YY-MM-DD
     :return:
     """
+    # 取得开始结束日期间的交易日数据
+    trading_days = Utils.get_trading_days(start, end)
+    # 遍历交易日，如果是月初，则读取APM因子载荷值；如果不是月初，则进行组合估值
+    prev_trading_day = Utils.get_prev_n_day(trading_days.iloc[0], 1)
+    factor_data = None  # 记录每次调仓时最新入选个股的APM因子信息,pd.DataFrame<date,factorvalue,id,buyprice>
+    port_nav = DataFrame({'date': [prev_trading_day.strftime('%Y-%m-%d')], 'nav': [1.0]})
+    for trading_day in trading_days:
+        if factor_data is None:
+            nav = port_nav[port_nav.date == prev_trading_day.strftime('%Y-%m-%d')].iloc[0].nav
+        else:
+            nav = port_nav[port_nav.date == factor_data.iloc[0].date].iloc[0].nav
+        interval_ret = 0.0
+        # 月初进行调仓
+        if Utils.is_month_start(trading_day):
+            logging.info('[%s] 月初调仓.' % Utils.datetimelike_to_str(trading_day, True))
+            # 调仓前，先估值计算按均价卖出原先组合个股在当天的估值
+            if factor_data is not None:
+                for ind, factor_info in factor_data.iterrows():
+                    daily_mkt = Utils.get_secu_daily_mkt(factor_info.id, trading_day, fq=True, range_lookup=True)
+                    if daily_mkt.date == trading_day.strftime('%Y-%m-%d'):
+                        vwap_price = daily_mkt.amount / daily_mkt.vol * daily_mkt.factor
+                    else:
+                        vwap_price = daily_mkt.close
+                    interval_ret += vwap_price / factor_info.buyprice - 1.0
+                interval_ret /= float(len(factor_data))
+                nav *= (1.0 + interval_ret)
+            # 读取factor_data
+            factor_data = Utils.read_factor_loading(APM.get_db_file(), Utils.datetimelike_to_str(prev_trading_day, False))
+            # 遍历factor_data，剔除在调仓日没有正常交易（如停牌）、及涨停的个股
+            ind_to_be_delted = []
+            for ind, factor_info in factor_data.iterrows():
+                trading_status = Utils.trading_status(factor_info.id, trading_day)
+                if trading_status == SecuTradingStatus.Suspend or trading_status == SecuTradingStatus.LimitUp:
+                    ind_to_be_delted.append(ind)
+            factor_data = factor_data.drop(ind_to_be_delted, axis=0)
+            # 对factor_data按因子值降序排列，取前10%个股
+            factor_data = factor_data.sort_values(by='factorvalue', ascending=False)
+            factor_data = factor_data.iloc[:int(len(factor_data)*0.1)]
+            # 遍历factor_data，添加买入价格，并估值计算当天调仓后的组合收益
+            factor_data['buyprice'] = 0.0
+            interval_ret = 0.0
+            for ind, factor_info in factor_data.iterrows():
+                daily_mkt = Utils.get_secu_daily_mkt(factor_info.id, trading_day, fq=True, range_lookup=False)
+                assert len(daily_mkt) > 0
+                factor_data.loc[ind, 'buyprice'] = daily_mkt.amount / daily_mkt.vol * daily_mkt.factor
+                interval_ret += daily_mkt.close / factor_data.loc[ind, 'buyprice'] - 1.0
+            interval_ret /= float(len(factor_data))
+            nav *= (1.0 + interval_ret)
+            # 保存factor_data
+            port_data_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.backtest_path,
+                                          'port_data_%s.csv' % Utils.datetimelike_to_str(trading_day, False))
+            factor_data.to_csv(port_data_path, index=False)
+        else:
+            # 非调仓日，对组合进行估值
+            logging.info('[%s] 月中估值' % Utils.datetimelike_to_str(trading_day, True))
+            if factor_data is not None:
+                for ind, factor_info in factor_data.iterrows():
+                    daily_mkt = Utils.get_secu_daily_mkt(factor_info.id, trading_day, fq=True, range_lookup=True)
+                    interval_ret += daily_mkt.close / factor_info.buyprice - 1.0
+                interval_ret /= float(len(factor_data))
+                nav *= (1.0 + interval_ret)
+        # 添加nav
+        port_nav = port_nav.append(Series({'date': trading_day.strftime('%Y-%m-%d'), 'nav': nav}), ignore_index=True)
+        # 设置prev_trading_day
+        prev_trading_day = trading_day
+    # 保存port_nav
+    port_nav_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.backtest_path, 'port_nav.csv')
+    port_nav.to_csv(port_nav_path, index=False)
 
 
 if __name__ == '__main__':
     # pass
     # APM._calc_factor_loading('SZ002558','2015-12-31')
     # APM.calc_factor_loading('2015-12-31')
-    APM.calc_factor_loading(start_date='2012-12-31', end_date='2013-12-31',month_end=True, save=True)
+    # APM.calc_factor_loading(start_date='2016-06-01', end_date='2016-10-31', month_end=True, save=True)
+    apm_backtest('2012-12-31', '2016-11-18')

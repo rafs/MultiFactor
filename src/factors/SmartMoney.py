@@ -153,7 +153,7 @@ class SmartMoney(Factor):
             # 3.计算累积成交量、累积成交金额
             df_min_mkt['accum_volume'] = df_min_mkt['volume'].cumsum()
             df_min_mkt['accum_amount'] = df_min_mkt['amount'].cumsum()
-            # 4.找到累积成交量占比前20找到累积成交量占比前20%的交易，视为聪明钱（smart）交易, 那么聪明钱的情绪因子Q=VWAP_{smart}/VWAP_{all}
+            # 4.找到累积成交量占比前20%找到累积成交量占比前20%的交易，视为聪明钱（smart）交易, 那么聪明钱的情绪因子Q=VWAP_{smart}/VWAP_{all}
             total_volume = df_min_mkt.iloc[df_min_mkt.shape[0]-1]['accum_volume'] * 100
             total_amount = df_min_mkt.iloc[df_min_mkt.shape[0]-1]['accum_amount']
             smart_volume = int(df_min_mkt.iloc[df_min_mkt.shape[0]-1]['accum_volume'] * 0.2)

@@ -25,8 +25,8 @@ MKT_MIN_FQ_HEADER = ['code', 'datetime', 'open', 'high', 'low', 'close', 'vol', 
 
 # 因子载荷文件持久化形式
 FACTOR_LOADING_PERSISTENCE_TYPE='shelve,csv'
-# 读取因子载荷采用的持久化形式
-USING_PERSISTENCE_TYPE='shelve'
+# 读取因子载荷采用的持久化形式，csv或shelve
+USING_PERSISTENCE_TYPE='csv'
 
 # 去极值方法中mad的乘数
 CLEAN_EXTREME_VALUE_MULTI_CONST=5.2

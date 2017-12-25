@@ -198,6 +198,7 @@ class APM(Factor):
             ret20_lst = []
             symbol_lst = []
 
+            # 采用单进程计算
             # for _, stock_info in stock_basics.iterrows():
             #     stat_i = cls._calc_factor_loading(stock_info.symbol, calc_date)
             #     ret20_i = Utils.calc_interval_ret(stock_info.symbol, end=calc_date, ndays=20)
@@ -334,5 +335,5 @@ if __name__ == '__main__':
     # pass
     # APM._calc_factor_loading('SZ002558','2015-12-31')
     # APM.calc_factor_loading('2015-12-31')
-    # APM.calc_factor_loading(start_date='2016-06-01', end_date='2016-10-31', month_end=True, save=True)
-    apm_backtest('2012-12-31', '2016-11-18')
+    APM.calc_factor_loading(start_date='2016-06-01', end_date='2016-10-31', month_end=True, save=True)
+    # apm_backtest('2012-12-31', '2016-11-18')

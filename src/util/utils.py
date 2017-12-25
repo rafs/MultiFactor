@@ -308,6 +308,61 @@ class Utils(object):
         return df_mkt_min
 
     @classmethod
+    def get_min_mkts_fq(cls, code, days, ret_num):
+        """
+        获取个股指定日期的复权分钟行情数据，日期范围由days列表指定，返回ret_num天的数据
+        Parameters:
+        ------
+        :param code:string
+            个股代码，如SH600000
+        :param days:list-like of string/datetime like, YYYY-MM-DD
+            日期列表
+        :param ret_num:int
+            返回的交易日数量
+        :return:
+            例如：如果要取得浦发银行过去30个交易日中的10个交易日复权分钟行情数据，那么参数设置为：
+                 code=SH600000, days为过去30个交易日列表, ret_num=10
+        ------
+          DataFrame
+            0: code，个股代码，如SH600000
+            1: time，时间，格式YYYY-MM-DD hh:mm:ss
+            2: open，开盘价
+            3: high，最高价
+            4: low，最低价
+            5: close，收盘价
+            6: volume，成交量(手)
+            7: amount，成交金额(元)
+            8: factor，复权系数
+            如果给定的日期范围内读取分钟数据天数小于ret_num天，那么be_enough=False，否则be_enough=True
+        """
+        # cfg = ConfigParser()
+        # cfg.read('config.ini')
+        # db_path = cfg.get('factor_db', 'db_path')   # 读取因子数据库路径
+        # db_path = factor_ct.FACTOR_DB.db_path
+        df_min_mkt = DataFrame()
+        k = 0
+        for trading_date in days:
+            mkt_file_path = os.path.join(ct.DB_PATH, ct.MKT_MIN_FQ, Utils.datetimelike_to_str(trading_date),'%s.csv' %
+                                         Utils.code_to_symbol(code))
+            if os.path.isfile(mkt_file_path):
+                # 读取个股每天的分钟行情数据
+                df = pd.read_csv(mkt_file_path,
+                                 names=['code', 'time', 'open', 'high', 'low', 'close', 'volume', 'amount', 'factor'],
+                                 skiprows=[0])
+                # 计算每分钟的涨跌幅，每天第一分钟的涨跌幅=close/open-1
+                df['ret'] = df['close'] / df['close'].shift(1) - 1.0
+                df.ix[0, 'ret'] = df.ix[0, 'close'] / df.ix[0, 'open'] - 1.0
+                # 拼接数据
+                df_min_mkt = df_min_mkt.append(df, ignore_index=True)
+                k += 1
+                if k >= ret_num:
+                    break
+        be_enough = True
+        if k < ret_num:
+            be_enough = False
+        return be_enough, df_min_mkt
+
+    @classmethod
     def trading_status(cls, code, trading_day):
         """
         返回个股在指定交易日的交易状态：正常、停牌、涨停、跌停

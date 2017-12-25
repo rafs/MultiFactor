@@ -57,6 +57,21 @@ class Factor(object):
         """
         pass
 
+    @classmethod
+    def _calc_factor_loading_proc(cls, code, calc_date, q):
+        """
+        用于并行计算因子载荷
+        Parameters
+        --------
+        :param code: str
+            个股代码，如果600000
+        :param calc_date: datetime like or str
+            计算日期，格式YYYY-MM-DD
+        :param q: 队列，用于进程间通信
+        :return: 添加因子载荷至队列q中
+        """
+        pass
+
 
 if __name__ == '__main__':
     pass

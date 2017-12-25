@@ -25,7 +25,7 @@ class JaqsApi(CDataApi):
             证券类别，1：股票，5：分级基金，101：股指期货，103：商品期货
         return: DataFrame
         --------
-            0: symbol, string, 个股代码, 如600000.SH
+            0: symbol, string, 个股代码, 如600000
             1: name, string, 证券名称
             2: status, string, 上市状态, 1:上市, 3:退市, 8:暂停上市
             3: market, string, 交易所代码

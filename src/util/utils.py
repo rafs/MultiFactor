@@ -447,8 +447,9 @@ class Utils(object):
         :return: DataFrame，因子载荷
         --------
             DataFrame:
-            0: ID, 证券代码，如SH600000，为索引
+            0: date, 日期，str，格式YYYY-MM-DD
             1: factorvalue,因子载荷
+            2: id, 证券代码，如SH600000
         """
         using_type = ct.USING_PERSISTENCE_TYPE
         if using_type == 'shelve':

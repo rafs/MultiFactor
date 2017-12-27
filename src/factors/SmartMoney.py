@@ -15,7 +15,7 @@ import pandas as pd
 from pandas import DataFrame
 from pandas import Series
 import math
-from src.util.utils import Utils
+from src.util.utils import Utils, SecuTradingStatus
 import src.factors.cons as factor_ct
 from src.util.dataapi.CDataHandler import CDataHandler
 from multiprocessing import Pool, Manager
@@ -269,7 +269,8 @@ class SmartMoney(Factor):
                 dict_factor['id'].append(smart_q[0])
                 dict_factor['factorvalue'].append(smart_q[1])
 
-            dict_factor['date'] = [calc_date] * len(dict_factor['id'])
+            date_label = Utils.get_trading_days(calc_date, ndays=2)[1]
+            dict_factor['date'] = [date_label] * len(dict_factor['id'])
             # 4.保存因子载荷至因子数据库
             if save:
                 # db = shelve.open(cls._db_file, flag='c', protocol=None, writeback=False)
@@ -282,6 +283,100 @@ class SmartMoney(Factor):
             logging.info('Suspending for 300s.')
             time.sleep(300)
         return dict_factor
+
+
+def smartq_backtest(start, end):
+    """
+    SmartQ因子的历史回测
+    Parameters:
+    --------
+    :param start: datetime-like, str
+        回测开始日期，格式：YYYY-MM-DD，开始日期应该为月初
+    :param end: datetime-like, str
+        回测结束日期，格式：YYYY-MM-DD
+    :return:
+    """
+    # 取得开始结束日期间的交易日序列
+    trading_days = Utils.get_trading_days(start, end)
+    # 遍历交易日，如果是月初，则读取SmartQ因子载荷值，进行调仓；如果不是月初，则进行组合估值
+    prev_trading_day = Utils.get_prev_n_day(trading_days.iloc[0], 1)
+    factor_data = None  # 记录每次调仓时最新入选个股的SmartQ因子信息，pd.DataFrame<date,factorvalue,id,buprice>
+    port_nav = DataFrame({'date': [prev_trading_day.strftime('%Y-%m-%d')], 'nav': [1.0]})
+    for trading_day in trading_days:
+        if factor_data is None:
+            nav = port_nav[port_nav.date==prev_trading_day.strftime('%Y-%m-%d')].iloc[0].nav
+        else:
+            nav = port_nav[port_nav.date==factor_data.iloc[0].date].iloc[0].nav
+        interval_ret = 0.0
+        # 月初进行调仓
+        if Utils.is_month_start(trading_day):
+            logging.info('[%s] 月初调仓.' % Utils.datetimelike_to_str(trading_day, True))
+            # 调仓前，先计算组合按均价卖出原先组合个股在当天的估值
+            if factor_data is not None:
+                for ind, factor_info in factor_data.iterrows():
+                    daily_mkt = Utils.get_secu_daily_mkt(factor_info.id, trading_day, fq=True, range_lookup=True)
+                    if daily_mkt.date == trading_day.strftime('%Y-%m-%d'):
+                        vwap_price = daily_mkt.amount / daily_mkt.vol * daily_mkt.factor
+                    else:
+                        vwap_price = daily_mkt.close
+                    interval_ret += vwap_price / factor_info.buyprice - 1.0
+                interval_ret /= float(len(factor_data))
+                nav *= (1.0 + interval_ret)
+            # 读取factor_data
+            factor_data = Utils.read_factor_loading(SmartMoney.get_db_file(), Utils.datetimelike_to_str(prev_trading_day, False))
+            # 遍历factor_data, 计算每个个股过去20天的涨跌幅，并剔除在调仓日没有正常交易（如停牌）及涨停的个股
+            ind_to_be_deleted = []
+            factor_data['ret20'] = np.zeros(len(factor_data))
+            for ind, factor_info in factor_data.iterrows():
+                trading_status = Utils.trading_status(factor_info.id, trading_day)
+                if trading_status == SecuTradingStatus.Suspend or trading_status == SecuTradingStatus.LimitUp:
+                    ind_to_be_deleted.append(ind)
+                fret20 = Utils.calc_interval_ret(factor_info.id, end=prev_trading_day, ndays=20)
+                if fret20 is None:
+                    if ind not in ind_to_be_deleted:
+                        ind_to_be_deleted.append(ind)
+                else:
+                    factor_data.loc[ind, 'ret20'] = fret20
+            factor_data = factor_data.drop(ind_to_be_deleted, axis=0)
+            # 对factor_data过去20天涨跌幅降序排列，剔除涨幅最大的20%个股
+            k = int(factor_data.shape[0]*0.2)
+            factor_data = factor_data.sort_values(by='ret20', ascending=False).iloc[k:]
+            del factor_data['ret20']    # 删除ret20列
+            # 对factor_data按因子值降序排列，取前10%个股
+            factor_data = factor_data.sort_values(by='factorvalue', ascending=False)
+            k = int(factor_data.shape[0]*0.1)
+            factor_data = factor_data.iloc[:k]
+            # 遍历factor_data，添加买入价格，并估值计算当天调仓后的组合收益
+            factor_data['buyprice'] = 0.0
+            interval_ret = 0.0
+            for ind, factor_info in factor_data.iterrows():
+                daily_mkt = Utils.get_secu_daily_mkt(factor_info.id, trading_day, fq=True, range_lookup=False)
+                assert len(daily_mkt) > 0
+                factor_data.loc[ind, 'buyprice'] = daily_mkt.amount / daily_mkt.vol * daily_mkt.factor
+                interval_ret += daily_mkt.close / factor_data.loc[ind, 'buyprice'] - 1.0
+            interval_ret /= float(factor_data.shape[0])
+            nav *= (1.0 + interval_ret)
+            # 保存factor_data
+            port_data_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.SMARTMONEY_CT.backtest_path,
+                                          'port_data_%s.csv' % Utils.datetimelike_to_str(trading_day, False))
+            factor_data.to_csv(port_data_path, index=False)
+        else:
+            # 非调仓日，对组合进行估值
+            logging.info('[%s] 月中估值.' % Utils.datetimelike_to_str(trading_day, True))
+            if factor_data is not None:
+                for ind, factor_info in factor_data.iterrows():
+                    daily_mkt = Utils.get_secu_daily_mkt(factor_info.id, trading_day, fq=True, range_lookup=True)
+                    interval_ret += daily_mkt.close / factor_info.buyprice - 1.0
+                interval_ret /= float(factor_data.shape[0])
+                nav *= (1.0 + interval_ret)
+        # 添加nav
+        port_nav = port_nav.append(Series({'date': Utils.datetimelike_to_str(trading_day, True), 'nav':nav}),
+                                   ignore_index=True)
+        # 设置prev_trading_day
+        prev_trading_day = trading_day
+    # 保存port_nav
+    port_nav_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.SMARTMONEY_CT.backtest_path, 'port_nav.csv')
+    port_nav.to_csv(port_nav_path, index=False)
 
 
 # def SmartMoney_BackTest(start, end):
@@ -501,18 +596,6 @@ class SmartMoney(Factor):
 
 if __name__ == '__main__':
     # 计算SmartQ因子载荷
-    SmartMoney.calc_factor_loading(start_date='2014-01-01',end_date='2014-02-01', month_end=True, save=True)
-    # trading_days = _get_year_tradingdays(2016)
-    # trading_days.sort()
-    # pre_trading_day = trading_days[0]
-    # for trading_day in trading_days:
-    #     if trading_day.month != pre_trading_day.month:
-    #         SmartMoney.calc_factor_loading(pre_trading_day.date(), True)
-    #         time.sleep(300)
-    #     pre_trading_day = trading_day
-    # SmartMoney.calc_factor_loading(trading_days[-1], True)
-    # print('The end.')
-
-    # test_start = '2012-12-31'
-    # test_end = '2013-01-31'
-    # SmartMoney_BackTest(test_start, test_end)
+    # SmartMoney.calc_factor_loading(start_date='2016-09-01',end_date='2016-10-31', month_end=True, save=True)
+    # 模拟组合历史回测
+    smartq_backtest('2013-01-04', '2016-11-18')

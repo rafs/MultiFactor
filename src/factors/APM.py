@@ -258,7 +258,7 @@ def apm_backtest(start, end):
     :param start: datetime-like, str
         回测开始日期，格式：YYYY-MM-DD，开始日期应该为月初的前一个交易日，即月末交易日
     :param end: datetime-like, str
-        回测结束日期，格式：YY-MM-DD
+        回测结束日期，格式：YYYY-MM-DD
     :return:
     """
     # 取得开始结束日期间的交易日数据
@@ -315,7 +315,7 @@ def apm_backtest(start, end):
             factor_data.to_csv(port_data_path, index=False)
         else:
             # 非调仓日，对组合进行估值
-            logging.info('[%s] 月中估值' % Utils.datetimelike_to_str(trading_day, True))
+            logging.info('[%s] 月中估值.' % Utils.datetimelike_to_str(trading_day, True))
             if factor_data is not None:
                 for ind, factor_info in factor_data.iterrows():
                     daily_mkt = Utils.get_secu_daily_mkt(factor_info.id, trading_day, fq=True, range_lookup=True)

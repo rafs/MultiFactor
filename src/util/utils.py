@@ -314,7 +314,7 @@ class Utils(object):
         Parameters:
         ------
         :param code:string
-            个股代码，如SH600000
+            个股代码，如SH600000或600000
         :param days:list-like of string/datetime like, YYYY-MM-DD
             日期列表
         :param ret_num:int

@@ -17,7 +17,7 @@ class Factor(object):
         return cls._db_file
 
     @classmethod
-    def calc_factor_loading(cls, start_date, end_date=None, month_end = True, save=False):
+    def calc_factor_loading(cls, start_date, end_date=None, month_end=True, save=False):
         """
         计算指定日期的样本个股的因子载荷，并保存至因子数据库
         Parameters

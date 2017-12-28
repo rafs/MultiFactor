@@ -20,6 +20,11 @@ APM_CT = DottableDict({'index_code': '000001',                              # �
                        'backtest_path': 'FactorBackTest/APM',               # 历史回测结果文件的保存路径（相对于因子数据库根目录的相对路径）
                        'constituent_ratio': 0.1                             # 多头组合的选股比例
                        })
+# IntradayMementum因子的配置参数
+INTRADAYMOMENTUM_CT = DottableDict({'days_num': 20,                                             # 计算因子载荷所需分钟行情的天数
+                                    'db_file': 'Momentum/IntradayMomentum/IntradayMomentum',    # 因子载荷的保存文件路径名（相对于因子数据库根目录的相对路径）
+                                    'backtest_path': 'FactorBackTest/IntradayMomentum'          # 历史回测结果文件的保存路径（相对于因子数据库根目录的相对路径）
+                                    })
 # 因子数据库的路径
 FACTOR_DB = DottableDict({'db_path': '/Users/davidyujun/Dropbox/FactorDB'})
 

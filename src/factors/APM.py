@@ -171,7 +171,7 @@ class APM(Factor):
         :return: 因子载荷，DataFrame
         --------
             因子载荷,DataFrame
-            0: ID, 证券ID，为索引
+            0: id, 证券ID
             1: factorvalue, 因子载荷
             如果end_date=None，返回start_date对应的因子载荷数据
             如果end_date!=None，返回最后一天的对应的因子载荷数据

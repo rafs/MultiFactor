@@ -139,7 +139,7 @@ class SmartMoney(Factor):
     def _calc_factor_loading(cls, code, calc_date):
         """
         计算指定日期、指定个股的聪明钱因子载荷
-        :param code: 个股代码，如SH600000
+        :param code: 个股代码，如SH600000或600000
         :param trading_days: 用于读取分钟行情的交易日期列表
         :return: float
             个股的SmartQ因子载荷值，无法计算返回None
@@ -185,9 +185,9 @@ class SmartMoney(Factor):
         Parameters
         --------
         :param code: str
-            个股代码，如果600000
-        :param trading_days: list like of datetime like or str
-            用于读取分钟行情的交易日期列表，降序排列
+            个股代码，如600000或SH600000
+        :param trading_days: datetime-like or str
+            计算日期
         :param q: 队列，用于进程间通信
         :return: 添加因子载荷至队列q中
         """
@@ -254,7 +254,7 @@ class SmartMoney(Factor):
             #     print("[%s]Calculating %s's SmartMoney factor loading = %.4f." % (calc_date.strftime('%Y-%m-%d'), stock_info.symbol, -1.0 if factor_loading is None else factor_loading))
             #     if factor_loading is not None:
             #         # df_factor.ix[code, 'factorvalue'] = factor_loading
-            #         dict_factor['id'].append(Utils.code_to_symbol(stock_info).symbol)
+            #         dict_factor['id'].append(Utils.code_to_symbol(stock_info.symbol))
             #         dict_factor['factorvalue'].append(factor_loading)
 
             # 采用多进程并行计算SmartQ因子载荷
@@ -302,6 +302,7 @@ def smartq_backtest(start, end):
     prev_trading_day = Utils.get_prev_n_day(trading_days.iloc[0], 1)
     factor_data = None  # 记录每次调仓时最新入选个股的SmartQ因子信息，pd.DataFrame<date,factorvalue,id,buprice>
     port_nav = DataFrame({'date': [prev_trading_day.strftime('%Y-%m-%d')], 'nav': [1.0]})
+    t = 0   # 记录调仓次数
     for trading_day in trading_days:
         if factor_data is None:
             nav = port_nav[port_nav.date==prev_trading_day.strftime('%Y-%m-%d')].iloc[0].nav
@@ -342,8 +343,8 @@ def smartq_backtest(start, end):
             k = int(factor_data.shape[0]*0.2)
             factor_data = factor_data.sort_values(by='ret20', ascending=False).iloc[k:]
             del factor_data['ret20']    # 删除ret20列
-            # 对factor_data按因子值降序排列，取前10%个股
-            factor_data = factor_data.sort_values(by='factorvalue', ascending=False)
+            # 对factor_data按因子值升序排列，取前10%个股
+            factor_data = factor_data.sort_values(by='factorvalue', ascending=True)
             k = int(factor_data.shape[0]*0.1)
             factor_data = factor_data.iloc[:k]
             # 遍历factor_data，添加买入价格，并估值计算当天调仓后的组合收益
@@ -360,6 +361,10 @@ def smartq_backtest(start, end):
             port_data_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.SMARTMONEY_CT.backtest_path,
                                           'port_data_%s.csv' % Utils.datetimelike_to_str(trading_day, False))
             factor_data.to_csv(port_data_path, index=False)
+            t += 1
+            if t % 6 == 0:
+                logging.info('Suspended for 300s.')
+                time.sleep(300)
         else:
             # 非调仓日，对组合进行估值
             logging.info('[%s] 月中估值.' % Utils.datetimelike_to_str(trading_day, True))

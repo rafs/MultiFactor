@@ -52,14 +52,17 @@ class IntradayMomentum(Factor):
         """
         # 取得过去90天的交易日序列，按日期降序排列
         trading_days = Utils.get_trading_days(end=calc_date, ndays=90, ascending=False)
-        # 取得个股过去90天中的最近21天的1分钟行情数据，根据每天的分钟行情读取日内5个时点的价格
+        # 取得个股过去90天中的最近21天的1分钟行情数据，根据每天的分钟行情读取日内5个时点的价格，并计算日内收益值
         mkt_data = DataFrame()
         mkt_data_header = ['date', 'p0930', 'p1030', 'p1130', 'p1400', 'p1500']
+        intra_day_ret = DataFrame()
+        ret_header = ['date', 'r0', 'r1', 'r2', 'r3', 'r4']
         k = 0
         for trading_day in trading_days:
             df_1m_mkt = Utils.get_min_mkt(code, trading_day, fq=True)
             if df_1m_mkt is None:
                 continue
+            # 计算日内5个时点的价格
             time_label = '%s 09:31:00' % trading_day.strftime('%Y-%m-%d')
             p0930 = df_1m_mkt[df_1m_mkt.datetime == time_label].iloc[0].open
             time_label = '%s 10:30:00' % trading_day.strftime('%Y-%m-%d')
@@ -72,26 +75,46 @@ class IntradayMomentum(Factor):
             p1500 = df_1m_mkt[df_1m_mkt.datetime == time_label].iloc[0].close
             s = Series([trading_day, p0930, p1030, p1130, p1400, p1500], index=mkt_data_header)
             mkt_data = mkt_data.append(s, ignore_index=True)
+            # 计算日内收益
+            if k > 0:
+                r0 = math.log(mkt_data.iloc[k-1].p0930 / mkt_data.iloc[k].p1500)
+                r1 = math.log(mkt_data.iloc[k-1].p1030 / mkt_data.iloc[k-1].p0930)
+                r2 = math.log(mkt_data.iloc[k-1].p1130 / mkt_data.iloc[k-1].p1030)
+                r3 = math.log(mkt_data.iloc[k-1].p1400 / mkt_data.iloc[k-1].p1130)
+                r4 = math.log(mkt_data.iloc[k-1].p1500 / mkt_data.iloc[k-1].p1400)
+
+                # r0 = mkt_data.iloc[k - 1].p0930 / mkt_data.iloc[k].p1500 -1.0
+                # r1 = mkt_data.iloc[k - 1].p1030 / mkt_data.iloc[k - 1].p0930 - 1.0
+                # r2 = mkt_data.iloc[k - 1].p1130 / mkt_data.iloc[k - 1].p1030 - 1.0
+                # r3 = mkt_data.iloc[k - 1].p1400 / mkt_data.iloc[k - 1].p1130 - 1.0
+                # r4 = mkt_data.iloc[k - 1].p1500 / mkt_data.iloc[k - 1].p1400 - 1.0
+
+                s = Series([mkt_data.iloc[k-1].date, r0, r1, r2, r3, r4], index=ret_header)
+                intra_day_ret = intra_day_ret.append(s, ignore_index=True)
             k += 1
             if k > cls.__days:
                 break
         if k <= cls.__days:
             return None
-        mkt_data = mkt_data.sort_values(by='date')
-        mkt_data = mkt_data.reset_index(drop=True)
+        intra_day_ret = intra_day_ret.sort_values(by='date')
+        # mkt_data = mkt_data.sort_values(by='date')
+        # mkt_data = mkt_data.reset_index(drop=True)
         # 计算传统动量因子值，=过去20日的涨跌幅
-        m_normal = math.log(mkt_data.iloc[-1].p1500 / mkt_data.iloc[0].p1500)
+        m_normal = math.log(mkt_data.iloc[0].p1500 / mkt_data.iloc[-1].p1500)
+
+        # m_normal = mkt_data.iloc[0].p1500 / mkt_data.iloc[-1].p1500 - 1.0
+
         # 遍历上述取得的行情数据，计算每日的日内收益值
-        intra_day_ret = DataFrame()
-        ret_header = ['date', 'r0', 'r1', 'r2', 'r3', 'r4']
-        for k in range(1, len(mkt_data)):
-            r0 = math.log(mkt_data.iloc[k].p0930 / mkt_data.iloc[k-1].p1500)
-            r1 = math.log(mkt_data.iloc[k].p1030 / mkt_data.iloc[k].p0930)
-            r2 = math.log(mkt_data.iloc[k].p1130 / mkt_data.iloc[k].p1030)
-            r3 = math.log(mkt_data.iloc[k].p1400 / mkt_data.iloc[k].p1130)
-            r4 = math.log(mkt_data.iloc[k].p1500 / mkt_data.iloc[k].p1400)
-            s = Series([mkt_data.iloc[k].date, r0, r1, r2, r3, r4], index=ret_header)
-            intra_day_ret = intra_day_ret.append(s, ignore_index=True)
+        # intra_day_ret = DataFrame()
+        # ret_header = ['date', 'r0', 'r1', 'r2', 'r3', 'r4']
+        # for k in range(1, len(mkt_data)):
+        #     r0 = math.log(mkt_data.iloc[k].p0930 / mkt_data.iloc[k-1].p1500)
+        #     r1 = math.log(mkt_data.iloc[k].p1030 / mkt_data.iloc[k].p0930)
+        #     r2 = math.log(mkt_data.iloc[k].p1130 / mkt_data.iloc[k].p1030)
+        #     r3 = math.log(mkt_data.iloc[k].p1400 / mkt_data.iloc[k].p1130)
+        #     r4 = math.log(mkt_data.iloc[k].p1500 / mkt_data.iloc[k].p1400)
+        #     s = Series([mkt_data.iloc[k].date, r0, r1, r2, r3, r4], index=ret_header)
+        #     intra_day_ret = intra_day_ret.append(s, ignore_index=True)
         intra_day_ret = intra_day_ret.set_index('date')
         # 个股的日内各时点的动量因子值等于过去20个交易日各个r_i累加
         intra_day_momentum = intra_day_ret.sum()
@@ -183,7 +206,7 @@ class IntradayMomentum(Factor):
             # 采用多进程并行计算日内动量因子载荷
             q = Manager().Queue()   # 队列，用于进程间通信，存储每个进程计算的因子载荷
             p = Pool(4)             # 进程池，最多同时开启4个进程
-            for _, stock_info in stock_basics.iloc[:200].iterrows():
+            for _, stock_info in stock_basics.iterrows():
                 p.apply_async(cls._calc_factor_loading_proc, args=(stock_info.symbol, calc_date, q,))
             p.close()
             p.join()

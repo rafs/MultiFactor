@@ -6,7 +6,8 @@
 # @Email   : yujun_mail@163.com
 
 # 因子数据库根目录
-DB_PATH = '/Users/davidyujun/Dropbox/FactorDB'
+# DB_PATH = '/Users/davidyujun/Dropbox/FactorDB'
+DB_PATH = '/Volumes/DB/FactorDB'
 # 日行情复权数据相对目录
 MKT_DAILY_FQ = 'ElementaryFactor/mkt_daily_FQ'
 # 日行情非复权数据相对目录

@@ -245,8 +245,8 @@ class APM(Factor):
             if save:
                 Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_apm)
             # 休息300秒
-            logging.info('Suspended for 300s.')
-            time.sleep(300)
+            logging.info('Suspended for 360s.')
+            time.sleep(360)
         return dict_apm
 
 
@@ -263,10 +263,14 @@ def apm_backtest(start, end):
     """
     # 取得开始结束日期间的交易日数据
     trading_days = Utils.get_trading_days(start, end)
-    # 遍历交易日，如果是月初，则读取APM因子载荷值；如果不是月初，则进行组合估值
+    # 读取截止开始日期前最新的组合回测数据
     prev_trading_day = Utils.get_prev_n_day(trading_days.iloc[0], 1)
-    factor_data = None  # 记录每次调仓时最新入选个股的APM因子信息,pd.DataFrame<date,factorvalue,id,buyprice>
-    port_nav = DataFrame({'date': [prev_trading_day.strftime('%Y-%m-%d')], 'nav': [1.0]})
+    backtest_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.backtest_path)
+    factor_data, port_nav = Utils.get_backtest_data(backtest_path, trading_days.iloc[0])
+    # factor_data = None  # 记录每次调仓时最新入选个股的APM因子信息,pd.DataFrame<date,factorvalue,id,buyprice>
+    if port_nav is None:
+        port_nav = DataFrame({'date': [prev_trading_day.strftime('%Y-%m-%d')], 'nav': [1.0]})
+    # 遍历交易日，如果是月初，则读取APM因子载荷值；如果不是月初，则进行组合估值
     for trading_day in trading_days:
         if factor_data is None:
             nav = port_nav[port_nav.date == prev_trading_day.strftime('%Y-%m-%d')].iloc[0].nav
@@ -335,5 +339,5 @@ if __name__ == '__main__':
     # pass
     # APM._calc_factor_loading('SZ002558','2015-12-31')
     # APM.calc_factor_loading('2015-12-31')
-    APM.calc_factor_loading(start_date='2016-06-01', end_date='2016-10-31', month_end=True, save=True)
-    # apm_backtest('2012-12-31', '2016-11-18')
+    # APM.calc_factor_loading(start_date='2017-01-01', end_date='2017-12-31', month_end=True, save=True)
+    apm_backtest('2016-11-18', '2017-12-31')

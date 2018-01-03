@@ -504,6 +504,38 @@ class Utils(object):
         return (raw_data - u)/s
 
     @classmethod
+    def get_backtest_data(cls, backtest_path, start_date):
+        """
+        读取截止start_date前的回测数据，包括port_data和port_nav数据
+        Parameters
+        --------
+        :param backtest_path: str
+            回测数据文件夹路径
+        :param start_date: datetime-like or str
+            回测开始日期，格式：YYYY-MM-DD or YYYYMMDD
+        :return: pandas.DataFrame
+            0: port_data, 截止start_date日期前组合最新的持仓数据
+            1: port_nav, 截止start_date日期前组合最新的净值数据
+        """
+        start_date = cls.to_date(start_date)
+        port_data = DataFrame()
+        port_nav = DataFrame()
+        # 遍历backtest_path文件夹下的文件，读取截止start_date日期前组合最新的持仓数据及净值数据
+        port_data_dates = []
+        for backtest_file in os.listdir(backtest_path):
+            if os.path.splitext(backtest_file)[0][:9] == 'port_data':
+                port_data_dates.append(os.path.splitext(backtest_file)[0][-8:])
+            if os.path.splitext(backtest_file)[0] == 'port_nav':
+                port_nav = pd.read_csv(os.path.join(backtest_path, backtest_file))
+                port_nav = port_nav[port_nav.date < start_date.strftime('%Y-%m-%d')]
+        port_data_dates = [x for x in port_data_dates if x < start_date.strftime('%Y%m%d')]
+        if len(port_data_dates) > 0:
+            port_data_date = max(port_data_dates)
+            port_data_path = os.path.join(backtest_path, 'port_data_%s.csv' % port_data_date)
+            port_data = pd.read_csv(port_data_path)
+        return port_data, port_nav
+
+    @classmethod
     def datetimelike_to_str(cls, datetime_like, dash=True):
         if isinstance(datetime_like, datetime.datetime) or isinstance(datetime_like, datetime.date):
             if dash:

@@ -233,4 +233,4 @@ class IntradayMomentum(Factor):
 
 if __name__ == '__main__':
     # pass
-    IntradayMomentum.calc_factor_loading(start_date='2012-12-31', end_date='2013-12-31', month_end=True, save=True)
+    IntradayMomentum.calc_factor_loading(start_date='2013-02-01', end_date='2013-12-31', month_end=True, save=True)

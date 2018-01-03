@@ -26,7 +26,8 @@ INTRADAYMOMENTUM_CT = DottableDict({'days_num': 20,                             
                                     'backtest_path': 'FactorBackTest/IntradayMomentum'          # 历史回测结果文件的保存路径（相对于因子数据库根目录的相对路径）
                                     })
 # 因子数据库的路径
-FACTOR_DB = DottableDict({'db_path': '/Users/davidyujun/Dropbox/FactorDB'})
+# FACTOR_DB = DottableDict({'db_path': '/Users/davidyujun/Dropbox/FactorDB'})
+FACTOR_DB = DottableDict({'db_path': '/Volumes/DB/FactorDB'})
 
 
 if __name__ == '__main__':

@@ -280,8 +280,8 @@ class SmartMoney(Factor):
                 #     db.close()
                 Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_factor)
             # 休息300秒
-            logging.info('Suspending for 300s.')
-            time.sleep(300)
+            logging.info('Suspending for 360s.')
+            time.sleep(360)
         return dict_factor
 
 
@@ -298,10 +298,14 @@ def smartq_backtest(start, end):
     """
     # 取得开始结束日期间的交易日序列
     trading_days = Utils.get_trading_days(start, end)
-    # 遍历交易日，如果是月初，则读取SmartQ因子载荷值，进行调仓；如果不是月初，则进行组合估值
+    # 读取截止开始日期前最新的组合回测数据
     prev_trading_day = Utils.get_prev_n_day(trading_days.iloc[0], 1)
-    factor_data = None  # 记录每次调仓时最新入选个股的SmartQ因子信息，pd.DataFrame<date,factorvalue,id,buprice>
-    port_nav = DataFrame({'date': [prev_trading_day.strftime('%Y-%m-%d')], 'nav': [1.0]})
+    backtest_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.SMARTMONEY_CT.backtest_path)
+    factor_data, port_nav = Utils.get_backtest_data(backtest_path, trading_days.iloc[0])
+    # factor_data = None  # 记录每次调仓时最新入选个股的SmartQ因子信息，pd.DataFrame<date,factorvalue,id,buprice>
+    if port_nav is None:
+        port_nav = DataFrame({'date': [prev_trading_day.strftime('%Y-%m-%d')], 'nav': [1.0]})
+    # 遍历交易日，如果是月初，则读取SmartQ因子载荷值，进行调仓；如果不是月初，则进行组合估值
     t = 0   # 记录调仓次数
     for trading_day in trading_days:
         if factor_data is None:
@@ -601,6 +605,6 @@ def smartq_backtest(start, end):
 
 if __name__ == '__main__':
     # 计算SmartQ因子载荷
-    # SmartMoney.calc_factor_loading(start_date='2016-09-01',end_date='2016-10-31', month_end=True, save=True)
+    SmartMoney.calc_factor_loading(start_date='2017-01-01',end_date='2017-12-31', month_end=True, save=True)
     # 模拟组合历史回测
-    smartq_backtest('2013-01-04', '2016-11-18')
+    # smartq_backtest('2016-11-19', '2017-12-31')

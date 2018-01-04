@@ -5,17 +5,18 @@
 # @Author  : YuJun
 # @Email   : yujun_mail@163.com
 
-from src.util import cons as ct
 import os
 import pandas as pd
 import numpy as np
 from pandas import Series
 from pandas import DataFrame
-import tushare as ts
+import csv
 import datetime
 import shelve
 from enum import Enum, auto
+from src.util import cons as ct
 from src.util.Cache import Cache
+import tushare as ts
 
 class SecuTradingStatus(Enum):
     """
@@ -536,6 +537,38 @@ class Utils(object):
         return port_data, port_nav
 
     @classmethod
+    def port_data_to_wind(cls, port_data_path, start=None, end=None):
+        """
+        把回测的port_data数据转换为wind的模拟组合持仓数据（权重形式）
+        Parameters:
+        --------
+        :param port_data_path: str
+            port_data数据文件夹路径
+        :param start: datetime-like or str
+            开始日期，默认None
+        :param end: datetime-like or str
+            结束日期，默认None
+            当start和end都为None时，转换文件夹下所有port_data数据
+            当start和end有一个为None时，转换start或end指定日期的port_data数据
+            当start和end都不为None时，转换开始、结束日期(含)之间的port_data数据
+        :return:
+        """
+        if not os.path.exists(port_data_path):
+            return
+        if not os.path.exists(os.path.join(port_data_path, 'port_nav.csv')):
+            return
+        else:
+            df_port_nav = pd.read_csv(os.path.join(port_data_path, 'port_nav.csv'), header=0)
+        if not os.path.exists(os.path.join(port_data_path, 'wind')):
+            os.mkdir(os.path.join(port_data_path, 'wind'))
+        if start is None and end is None:
+            for port_data_file in os.listdir(port_data_path):
+                if port_data_file[:9] == 'port_data':
+                    wind_data_file = os.path.join(port_data_path, 'wind', port_data_file)
+                    print('processing file %s.' % port_data_file)
+                    _port_data_to_wind(os.path.join(port_data_path, port_data_file), wind_data_file, df_port_nav)
+
+    @classmethod
     def datetimelike_to_str(cls, datetime_like, dash=True):
         if isinstance(datetime_like, datetime.datetime) or isinstance(datetime_like, datetime.date):
             if dash:
@@ -597,11 +630,55 @@ def _code_to_index_symbol(code):
     else:
         return 'SZ%s' % code if code[:3] == '399' else 'SH%s' % code
 
+def _symbol_to_windcode(symbol):
+    """
+    将本系统的证券代码symbol转换为wind代码
+    :param symbol: str
+        本系统证券代码，如SH600000
+    :return: str
+        wind证券代码，如600000.SH
+    """
+    return '%s.%s' % (symbol[2:], symbol[:2])
+
+def _port_data_to_wind(port_data_file, wind_data_file, df_port_nav):
+    """
+    把回测的port_data数据转换为wind的模拟组合持仓数据（权重形式）
+    Parameters:
+    --------
+    :param port_data_file: str
+        port_data数据文件路径
+    :param wind_data_file: wind模拟组合持仓数据文件路径
+    :param df_port_nav: pandas.DataFrame
+        组合净值数据columns=['date', 'nav']
+    :return:
+    """
+    df_port_data = pd.read_csv(port_data_file, header=0)
+    if df_port_data.shape[0] > 0:
+        fweight = 1.0 / df_port_data.shape[0]
+    else:
+        fweight = 0.0
+    str_weight = '%.4f%%' % round(fweight * 100, 4)
+    dst_rows = [['证券代码', '持仓权重', '成本价格', '调整日期', '证券类型']]
+    str_date = df_port_data.iloc[0].date
+    fnav = df_port_nav[df_port_nav.date < str_date].iloc[-1].nav * 100000000.0
+    dst_rows.append(['Asset', str(fnav), '1', str_date])
+    for _, port_data in df_port_data.iterrows():
+        str_date = port_data.date
+        wind_code = _symbol_to_windcode(port_data.id)
+        df_mkt_data = Utils.get_secu_daily_mkt(port_data.id, str_date)
+        str_buy_price = str(round(df_mkt_data.open, 2))
+        dst_rows.append([wind_code, str_weight, str_buy_price, str_date, '股票'])
+    with open(wind_data_file, 'w', newline='') as f:
+        csv_writer = csv.writer(f, delimiter=' ')
+        csv_writer.writerows(dst_rows)
+
+
+
 
 if __name__ == '__main__':
     # test calc_interval_ret
-    ret = Utils.calc_interval_ret('600000', start=datetime.datetime.strptime('2016-01-01', '%Y-%m-%d'), end='2016-10-16')
-    print('ret = %0.4f' % ret)
+    # ret = Utils.calc_interval_ret('600000', start=datetime.datetime.strptime('2016-01-01', '%Y-%m-%d'), end='2016-10-16')
+    # print('ret = %0.4f' % ret)
     # test get_trading_days
     # trading_days = Utils.get_trading_days(start=datetime.datetime.strptime('2017-01-01', '%Y-%m-%d'), end='2017-10-31', ndays=10)
     # print(len(trading_days))
@@ -612,10 +689,11 @@ if __name__ == '__main__':
     # trading_days = Utils.get_trading_days()
     # print(len(trading_days))
     # test datetimelike_to_str
-    print(Utils.datetimelike_to_str('2017-12-07', dash=False))
-    print(Utils.datetimelike_to_str('20171207'))
-    print(Utils.datetimelike_to_str(datetime.date(2017, 12, 7), dash=False))
+    # print(Utils.datetimelike_to_str('2017-12-07', dash=False))
+    # print(Utils.datetimelike_to_str('20171207'))
+    # print(Utils.datetimelike_to_str(datetime.date(2017, 12, 7), dash=False))
     # test get_secu_daily_mkt
-    mkt = Utils.get_secu_daily_mkt('600827', '2015-03-05', range_lookup=False)
-    print(mkt)
-    print(mkt.shape)
+    # mkt = Utils.get_secu_daily_mkt('600827', '2015-03-05', range_lookup=False)
+    # print(mkt)
+    # print(mkt.shape)
+    Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/APM')

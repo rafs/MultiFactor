@@ -338,6 +338,6 @@ def apm_backtest(start, end):
 if __name__ == '__main__':
     # pass
     # APM._calc_factor_loading('SZ002558','2015-12-31')
-    # APM.calc_factor_loading('2015-12-31')
+    # APM.calc_factor_loading('2017-12-29')
     # APM.calc_factor_loading(start_date='2017-01-01', end_date='2017-12-31', month_end=True, save=True)
-    apm_backtest('2016-11-18', '2017-12-31')
+    apm_backtest('2018-01-01', '2018-01-03')

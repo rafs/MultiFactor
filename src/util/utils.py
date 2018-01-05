@@ -18,6 +18,7 @@ from src.util import cons as ct
 from src.util.Cache import Cache
 import tushare as ts
 
+
 class SecuTradingStatus(Enum):
     """
     个股的交易状态：正常、停牌、涨停、跌停
@@ -26,6 +27,7 @@ class SecuTradingStatus(Enum):
     Suspend = auto()        # 停牌
     LimitUp = auto()        # 涨停
     LimitDown = auto()      # 跌停
+
 
 class Utils(object):
 
@@ -343,7 +345,7 @@ class Utils(object):
         df_min_mkt = DataFrame()
         k = 0
         for trading_date in days:
-            mkt_file_path = os.path.join(ct.DB_PATH, ct.MKT_MIN_FQ, Utils.datetimelike_to_str(trading_date),'%s.csv' %
+            mkt_file_path = os.path.join(ct.DB_PATH, ct.MKT_MIN_FQ, Utils.datetimelike_to_str(trading_date), '%s.csv' %
                                          Utils.code_to_symbol(code))
             if os.path.isfile(mkt_file_path):
                 # 读取个股每天的分钟行情数据
@@ -561,12 +563,20 @@ class Utils(object):
             df_port_nav = pd.read_csv(os.path.join(port_data_path, 'port_nav.csv'), header=0)
         if not os.path.exists(os.path.join(port_data_path, 'wind')):
             os.mkdir(os.path.join(port_data_path, 'wind'))
+        wind_port_datas = [['证券代码', '持仓权重', '成本价格', '调整日期', '证券类型']]
         if start is None and end is None:
             for port_data_file in os.listdir(port_data_path):
                 if port_data_file[:9] == 'port_data':
                     wind_data_file = os.path.join(port_data_path, 'wind', port_data_file)
                     print('processing file %s.' % port_data_file)
-                    _port_data_to_wind(os.path.join(port_data_path, port_data_file), wind_data_file, df_port_nav)
+                    wind_port_data = _port_data_to_wind(os.path.join(port_data_path, port_data_file), wind_data_file, df_port_nav)
+                    if len(wind_port_data) > 0:
+                        for row in wind_port_data[1:]:
+                            wind_port_datas.append(row)
+        # 保存
+        with open(os.path.join(port_data_path, 'wind', 'agg_wind_port_data.csv'), 'w', newline='') as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerows(wind_port_datas)
 
     @classmethod
     def datetimelike_to_str(cls, datetime_like, dash=True):
@@ -630,6 +640,7 @@ def _code_to_index_symbol(code):
     else:
         return 'SZ%s' % code if code[:3] == '399' else 'SH%s' % code
 
+
 def _symbol_to_windcode(symbol):
     """
     将本系统的证券代码symbol转换为wind代码
@@ -639,6 +650,7 @@ def _symbol_to_windcode(symbol):
         wind证券代码，如600000.SH
     """
     return '%s.%s' % (symbol[2:], symbol[:2])
+
 
 def _port_data_to_wind(port_data_file, wind_data_file, df_port_nav):
     """
@@ -660,19 +672,18 @@ def _port_data_to_wind(port_data_file, wind_data_file, df_port_nav):
     str_weight = '%.4f%%' % round(fweight * 100, 4)
     dst_rows = [['证券代码', '持仓权重', '成本价格', '调整日期', '证券类型']]
     str_date = df_port_data.iloc[0].date
-    fnav = df_port_nav[df_port_nav.date < str_date].iloc[-1].nav * 100000000.0
-    dst_rows.append(['Asset', str(fnav), '1', str_date])
+    # fnav = df_port_nav[df_port_nav.date < str_date].iloc[-1].nav * 100000000.0
+    # dst_rows.append(['Asset', str(fnav), '1', str_date])
     for _, port_data in df_port_data.iterrows():
         str_date = port_data.date
         wind_code = _symbol_to_windcode(port_data.id)
         df_mkt_data = Utils.get_secu_daily_mkt(port_data.id, str_date)
-        str_buy_price = str(round(df_mkt_data.open, 2))
+        str_buy_price = str(round(df_mkt_data.amount/df_mkt_data.vol, 2))
         dst_rows.append([wind_code, str_weight, str_buy_price, str_date, '股票'])
     with open(wind_data_file, 'w', newline='') as f:
-        csv_writer = csv.writer(f, delimiter=' ')
+        csv_writer = csv.writer(f)
         csv_writer.writerows(dst_rows)
-
-
+    return dst_rows
 
 
 if __name__ == '__main__':

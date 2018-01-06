@@ -605,6 +605,6 @@ def smartq_backtest(start, end):
 
 if __name__ == '__main__':
     # 计算SmartQ因子载荷
-    SmartMoney.calc_factor_loading(start_date='2017-08-01',end_date='2017-12-31', month_end=True, save=True)
+    SmartMoney.calc_factor_loading(start_date='2018-01-01',end_date='2018-01-05', month_end=True, save=True)
     # 模拟组合历史回测
     # smartq_backtest('2016-11-19', '2017-12-31')

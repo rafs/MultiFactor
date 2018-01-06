@@ -16,6 +16,8 @@ MKT_DAILY_NOFQ = 'ElementaryFactor/mkt_daily_NoFQ'
 MKT_MIN_FQ = 'ElementaryFactor/mkt_1min_FQ'
 # 分钟行情非复权数据相对目录
 MKT_MIN_NOFQ = 'ElementaryFactor/mkt_1min_NoFQ'
+# 股本结构数据相对目录
+CAP_STRUCT = 'ElementaryFactor/cap_struct'
 
 # 日行情复权数据的表头
 MKT_DAILY_FQ_HEADER = ['code', 'date', 'open', 'high', 'low', 'close', 'vol', 'amount', 'turnover1', 'turnover2', 'factor']
@@ -23,6 +25,8 @@ MKT_DAILY_FQ_HEADER = ['code', 'date', 'open', 'high', 'low', 'close', 'vol', 'a
 MKT_DAILY_NOFQ_HEADER = ['date', 'open', 'high', 'low', 'close', 'vol', 'amount', 'turnover1', 'turnover2']
 # 分钟行情复权数据的表头
 MKT_MIN_FQ_HEADER = ['code', 'datetime', 'open', 'high', 'low', 'close', 'vol', 'amount', 'factor']
+# 股票股本结构数据的表头
+CAP_STRUCT_HEADER = ['code', 'date', 'reason', 'total', 'liquid_a', 'liquid_b', 'liquid_h']
 
 # 因子载荷文件持久化形式
 FACTOR_LOADING_PERSISTENCE_TYPE='shelve,csv'

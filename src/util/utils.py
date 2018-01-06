@@ -365,6 +365,43 @@ class Utils(object):
             be_enough = False
         return be_enough, df_min_mkt
 
+    # 个股股本结构数据静态变量
+    utils_cap_struct = DataFrame()
+
+    @classmethod
+    def get_cap_struct(cls, code, date):
+        """
+        读取个股指定日期最新的股本结构数据
+        Parameters:
+        --------
+        :param code: str
+            股票代码，如600000或SH600000
+        :param date: datetime-like or str
+            日期
+        :return: pd.Series
+            个股截止指定日期的最新股本结构数据
+        --------
+            0: code, 代码, str
+            1: date, 变更日期, str
+            2: reason, 变更原因, str
+            3: total, 总股本, float
+            4: liquid_a, 流通A股, float
+            5: liquid_b, 流通B股, float
+            6: liquid_h, 流通H股, float
+            如果截止指定日期最新股本结构数据不存在，返回None
+        """
+        code = cls.code_to_symbol(code)
+        str_date = cls.datetimelike_to_str(cls.to_date(date))
+        # 如果utils_cap_struct变量为空，那么先导入
+        if cls.utils_cap_struct.shape[0] == 0:
+            cap_struct_path = os.path.join(ct.DB_PATH, ct.CAP_STRUCT, 'cap_struct.csv')
+            cls.utils_cap_struct = pd.read_csv(cap_struct_path, names=ct.CAP_STRUCT_HEADER, header=0)
+        cap_struct = cls.utils_cap_struct[(cls.utils_cap_struct.code == code) & (cls.utils_cap_struct.date <= str_date)]
+        if cap_struct.shape[0] > 0:
+            return cap_struct.iloc[-1]
+        else:
+            return None
+
     @classmethod
     def trading_status(cls, code, trading_day):
         """
@@ -707,4 +744,5 @@ if __name__ == '__main__':
     # mkt = Utils.get_secu_daily_mkt('600827', '2015-03-05', range_lookup=False)
     # print(mkt)
     # print(mkt.shape)
-    Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/APM')
+    # Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/APM')
+    print(Utils.get_cap_struct('600000', '2018-01-06'))

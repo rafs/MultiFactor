@@ -744,5 +744,5 @@ if __name__ == '__main__':
     # mkt = Utils.get_secu_daily_mkt('600827', '2015-03-05', range_lookup=False)
     # print(mkt)
     # print(mkt.shape)
-    # Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/APM')
-    print(Utils.get_cap_struct('600000', '2018-01-06'))
+    Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/SmartQ')
+    # print(Utils.get_cap_struct('600000', '2018-01-06'))

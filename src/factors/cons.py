@@ -26,7 +26,7 @@ INTRADAYMOMENTUM_CT = DottableDict({'days_num': 20,                             
                                     'backtest_path': 'FactorBackTest/IntradayMomentum'          # 历史回测结果文件的保存路径（相对于因子数据库根目录的相对路径）
                                     })
 # 规模因子的配置参数
-SCALE_CT = DottableDict({'db_file': 'Scale/Scale'})
+SCALE_CT = DottableDict({'db_file': 'ElementaryFactor/Scale/Scale'})
 # 因子数据库的路径
 # FACTOR_DB = DottableDict({'db_path': '/Users/davidyujun/Dropbox/FactorDB'})
 FACTOR_DB = DottableDict({'db_path': '/Volumes/DB/FactorDB'})

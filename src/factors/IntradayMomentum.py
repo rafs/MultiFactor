@@ -225,12 +225,12 @@ class IntradayMomentum(Factor):
             # 保存因子载荷至因子数据库
             if save:
                 Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_intraday_momentum)
-            # 休息300秒
-            logging.info('Suspending for 300s.')
-            time.sleep(300)
+            # 休息360秒
+            logging.info('Suspending for 360s.')
+            time.sleep(360)
         return dict_intraday_momentum
 
 
 if __name__ == '__main__':
     # pass
-    IntradayMomentum.calc_factor_loading(start_date='2013-02-01', end_date='2013-12-31', month_end=True, save=True)
+    IntradayMomentum.calc_factor_loading(start_date='2014-01-01', end_date='2014-12-31', month_end=True, save=True)

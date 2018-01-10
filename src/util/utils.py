@@ -53,6 +53,7 @@ class Utils(object):
         :return:
         --------
             float，证券的区间收益率
+            计算失败，返回None
         """
         symbol = _code_to_symbol(secu_code)
         file_path = '%s.csv' % (os.path.join(ct.DB_PATH, ct.MKT_DAILY_FQ, symbol))
@@ -141,6 +142,10 @@ class Utils(object):
             df_SZZS = ts.bar(code='000001', conn=ts_conn, asset='INDEX')
             ts.close_apis(ts_conn)
             Utils.utils_trading_days = Series(df_SZZS.index).sort_values()
+        if start is not None:
+            start = cls.to_date(start)
+        if end is not None:
+            end = cls.to_date(end)
         if start is not None and end is not None:
             trading_days = Utils.utils_trading_days[(Utils.utils_trading_days >= start) & (Utils.utils_trading_days <= end)]
         elif start is not None and ndays is not None:
@@ -728,7 +733,7 @@ if __name__ == '__main__':
     # ret = Utils.calc_interval_ret('600000', start=datetime.datetime.strptime('2016-01-01', '%Y-%m-%d'), end='2016-10-16')
     # print('ret = %0.4f' % ret)
     # test get_trading_days
-    # trading_days = Utils.get_trading_days(start=datetime.datetime.strptime('2017-01-01', '%Y-%m-%d'), end='2017-10-31', ndays=10)
+    trading_days = Utils.get_trading_days(start=datetime.datetime.strptime('2017-01-01', '%Y-%m-%d'), end='20171031', ndays=10)
     # print(len(trading_days))
     # trading_days = Utils.get_trading_days(start=pd.Timestamp('2017-01-01'), end='2017-10-31', ndays=10)
     # print(len(trading_days))
@@ -744,5 +749,6 @@ if __name__ == '__main__':
     # mkt = Utils.get_secu_daily_mkt('600827', '2015-03-05', range_lookup=False)
     # print(mkt)
     # print(mkt.shape)
-    Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/SmartQ')
-    # print(Utils.get_cap_struct('600000', '2018-01-06'))
+    # Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/SmartQ')
+    df = ts.get_industry_classified('sw')
+    print(df.head())

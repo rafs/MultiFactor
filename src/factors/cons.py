@@ -27,6 +27,12 @@ INTRADAYMOMENTUM_CT = DottableDict({'days_num': 20,                             
                                     })
 # 规模因子的配置参数
 SCALE_CT = DottableDict({'db_file': 'ElementaryFactor/Scale/Scale'})
+# 传统动量因子的配置参数
+MOMENTUM_CT = DottableDict({'short_term_days': '20|60',                 # 短期动量交易日天数
+                            'long_term_days': '120|240',                # 长期动量交易日天数
+                            'db_file': 'Momentum/Momentum/Momentum',    # 因子载荷的保存文件路径（相对于因子数据库根目录的相对路径）
+                            'backtest_path': 'FactorBackTest/Momentum'  # 历史回测结果文件的保存路径（相对于因子数据库根目录的相对路径）
+                            })
 # 因子数据库的路径
 # FACTOR_DB = DottableDict({'db_path': '/Users/davidyujun/Dropbox/FactorDB'})
 FACTOR_DB = DottableDict({'db_path': '/Volumes/DB/FactorDB'})

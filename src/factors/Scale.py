@@ -12,6 +12,7 @@ import src.factors.cons as factor_ct
 from src.util.utils import Utils
 from src.util.dataapi.CDataHandler import CDataHandler
 from pandas import Series
+import math
 import os
 from multiprocessing import Pool, Manager
 import datetime
@@ -56,8 +57,8 @@ class Scale(Factor):
         # 计算证券的规模因子
         scale_factor = Series()
         total_cap = cap_struct.total - cap_struct.liquid_b - cap_struct.liquid_h
-        scale_factor['LnTotalMktCap'] = total_cap * mkt_daily.close
-        scale_factor['LnLiquidMktCap'] = cap_struct.liquid_a * mkt_daily.close
+        scale_factor['LnTotalMktCap'] = math.log(total_cap * mkt_daily.close)
+        scale_factor['LnLiquidMktCap'] = math.log(cap_struct.liquid_a * mkt_daily.close)
         return scale_factor
 
     @classmethod
@@ -129,8 +130,8 @@ class Scale(Factor):
             #     if scale_data is not None:
             #         logging.info("[%s] %s's total mkt cap = %.0f, liquid mkt cap = %.0f" % (calc_date.strftime('%Y-%m-%d'), stock_info.symbol, scale_data.LnTotalMktCap, scale_data.LnLiquidMktCap))
             #         dict_scale['id'].append(Utils.code_to_symbol(stock_info.symbol))
-            #         dict_scale['LnTotalMktCap'].append(round(scale_data.LnTotalMktCap, 2))
-            #         dict_scale['LnLiquidMktCap'].append(round(scale_data.LnLiquidMktCap, 2))
+            #         dict_scale['LnTotalMktCap'].append(round(scale_data.LnTotalMktCap, 4))
+            #         dict_scale['LnLiquidMktCap'].append(round(scale_data.LnLiquidMktCap, 4))
 
             # 采用多进程并行计算规模因子
             q = Manager().Queue()   # 队列，用于进程间通信，存储每个进程计算的规模因子值
@@ -142,20 +143,20 @@ class Scale(Factor):
             while not q.empty():
                 scale_data = q.get(True)
                 dict_scale['id'].append(scale_data[0])
-                dict_scale['LnTotalMktCap'].append(round(scale_data[1], 2))
-                dict_scale['LnLiquidMktCap'].append(round(scale_data[2], 2))
+                dict_scale['LnTotalMktCap'].append(round(scale_data[1], 4))
+                dict_scale['LnLiquidMktCap'].append(round(scale_data[2], 4))
 
             date_label = Utils.get_trading_days(start=calc_date, ndays=2)[1]
             dict_scale['date'] = [date_label] * len(dict_scale['id'])
             # 保存规模因子载荷至因子数据库
             if save:
                 Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_scale)
-            # 休息300秒
-            logging.info('Suspending for 300s.')
-            time.sleep(300)
+            # 休息60秒
+            logging.info('Suspending for 60s.')
+            time.sleep(60)
         return dict_scale
 
 
 if __name__ == '__main__':
     # pass
-    Scale.calc_factor_loading(start_date='2012-12-31', end_date='2013-12-31', month_end=True, save=True)
+    Scale.calc_factor_loading(start_date='2017-01-01', end_date='2017-12-31', month_end=True, save=True)

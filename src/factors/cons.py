@@ -33,6 +33,10 @@ MOMENTUM_CT = DottableDict({'short_term_days': '20|60',                 # 短期
                             'db_file': 'Momentum/Momentum/Momentum',    # 因子载荷的保存文件路径（相对于因子数据库根目录的相对路径）
                             'backtest_path': 'FactorBackTest/Momentum'  # 历史回测结果文件的保存路径（相对于因子数据库根目录的相对路径）
                             })
+# 价值因子的配置参数
+VALUE_CT = DottableDict({'db_file': 'Value/Value',                      # 因子载荷的保存文件相对路径
+                         'backtest_path': 'FactorBackTest/Value'        # 历史回测结果文件的相对保存路径
+                         })
 # 因子数据库的路径
 # FACTOR_DB = DottableDict({'db_path': '/Users/davidyujun/Dropbox/FactorDB'})
 FACTOR_DB = DottableDict({'db_path': '/Volumes/DB/FactorDB'})

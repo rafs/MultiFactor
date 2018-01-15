@@ -160,9 +160,9 @@ class Momentum(Factor):
             # 保存因子载荷至因子数据库
             if save:
                 Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_momentum)
-            # 休息300秒
-            logging.info('Suspending for 300s.')
-            time.sleep(300)
+            # 休息60秒
+            logging.info('Suspending for 60s.')
+            time.sleep(60)
         return dict_momentum
 
 
@@ -183,4 +183,4 @@ class Momentum(Factor):
 if __name__ == '__main__':
     # pass
     # Momentum._calc_factor_loading('300355', '2012-12-31')
-    Momentum.calc_factor_loading(start_date='2012-12-31', end_date='2013-12-31', month_end=True, save=True)
+    Momentum.calc_factor_loading(start_date='2017-01-01', end_date='2017-12-31', month_end=True, save=True)

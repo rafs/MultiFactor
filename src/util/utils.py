@@ -408,6 +408,164 @@ class Utils(object):
             return None
 
     @classmethod
+    def get_fin_basic_data(cls, code, report_date):
+        """
+        读取个股最新的财务数据
+        Parameter:
+        --------
+        :param code: str
+            证券代码，如600000或SH600000
+        :param report_date: datetime-like or str
+            日期，格式：YYYY-MM-DD or YYYYMMDD
+        :return: pd.Series
+        --------
+            0. ReportDate
+            1. BasicEPS:基本每股收益（元）
+            2. UnitNetAsset:每股净资产（元）
+            3. UnitNetOperateCashFlow:每股经营活动净现金流（元）
+            4. MainOperateRevenue:主营业务收入（万元）
+            5. MainOperateProfit:主营业务利润（万元）
+            6. OperateProfit:营业利润（万元）
+            7. InvestIncome:投资收益（万元）
+            8. NonOperateNetIncome:营业外收支净额（万元）
+            9. TotalProfit:利润总额（万元）
+            10. NetProfit:净利润（万元）
+            11. DeductedNetPorfit:扣除非经常性损益后净利润（万元）
+            12. NetOperateCashFlow:经营活动现金流净额（万元）
+            13. CashEquivalentsChg:现金及现金等价物增加额（万元）
+            14. TotalAsset:总资产（万元）
+            15. CurrentAsset:流动资产（万元）
+            16. TotalLiability:总负债（万元）
+            17. CurrentLiability:流动负债（万元）
+            18. ShareHolderEquity:归属母公司股东权益（万元）
+            19. ROE:净资产收益率加权（%）
+            读取失败，返回None
+        """
+        code = cls.code_to_symbol(code)
+        date = cls.to_date(report_date)
+        if not cls.is_fin_report_date(date):
+            return None
+        fin_basic_data_path = os.path.join(ct.FIN_BASIC_DATA_PATH, '%s.csv' % code)
+        df_fin_basic_data = pd.read_csv(fin_basic_data_path, na_values='--', parse_dates=[0],
+                                        names=ct.FIN_BASIC_DATA_HEADER, header=0)
+        fin_basic_data = df_fin_basic_data[df_fin_basic_data.ReportDate == date]
+        if fin_basic_data.shape[0] == 0:
+            return None
+        else:
+            return fin_basic_data.iloc[0]
+
+    @classmethod
+    def get_ttm_fin_basic_data(cls, code, date):
+        """
+        读取个股最新ttm财务数据
+        Parameters:
+        --------
+        :param code: str
+            个股代码，如SH600000或600000
+        :param date: datetime-like or str
+            日期，格式YYYY-MM-DD or YYYYMMDD
+        :return: pd.Series
+        --------
+        0. ReportDate: 报告期
+        1. MainOperateRevenue: 主营业务收入（万元）
+        2. MainOperateProfit: 主营业务利润（万元）
+        3. OperateProfit: 营业利润（万元）
+        4. InvestIncome: 投资收益（万元）
+        5. NonOperateNetIncome: 营业外收益净额（万元）
+        6. TotalProfit: 利润总额（万元）
+        7. NetProfit: 净利润（万元）
+        8. DeductedNetProfit: 扣除非经常性损益后净利润（万元）
+        9. NetOperateCashFlow: 经营活动现金流净额（万元）
+        读取失败，返回None
+        """
+        code = cls.code_to_symbol(code)
+        date = cls.to_date(date)
+        if date.month in (5, 6, 7, 8):
+            date1 = datetime.datetime(date.year, 3, 31)
+            date2 = datetime.datetime(date.year-1, 12, 31)
+            date3 = datetime.datetime(date.year-1, 3, 31)
+        elif date.month in (9, 10):
+            date1 = datetime.datetime(date.year, 6, 30)
+            date2 = datetime.datetime(date.year-1, 12, 31)
+            date3 = datetime.datetime(date.year-1, 6, 30)
+        elif date.month in (11, 12):
+            date1 = datetime.datetime(date.year, 9, 30)
+            date2 = datetime.datetime(date.year-1, 12, 31)
+            date3 = datetime.datetime(date.year-1, 9, 30)
+        else:
+            date1 = datetime.datetime(date.year-1, 9, 30)
+            date2 = datetime.datetime(date.year-2, 12, 31)
+            date3 = datetime.datetime(date.year-2, 9, 30)
+        fin_basic_data1 = cls.get_fin_basic_data(code, date1)
+        fin_basic_data2 = cls.get_fin_basic_data(code, date2)
+        fin_basic_data3 = cls.get_fin_basic_data(code, date3)
+        ttm_fin_basic_data = Series()
+        ttm_fin_basic_data['ReportDate'] = date1
+        ttm_fin_basic_data['MainOperateRevenue'] = fin_basic_data1['MainOperateRevenue'] + fin_basic_data2['MainOperateRevenue'] - fin_basic_data3['MainOperateRevenue']
+        ttm_fin_basic_data['MainOperateProfit'] = fin_basic_data1['MainOperateProfit'] + fin_basic_data2['MainOperateProfit'] - fin_basic_data3['MainOperateProfit']
+        ttm_fin_basic_data['OperateProfit'] = fin_basic_data1['OperateProfit'] + fin_basic_data2['OperateProfit'] - fin_basic_data3['OperateProfit']
+        ttm_fin_basic_data['InvestIncome'] = fin_basic_data1['InvestIncome'] + fin_basic_data2['InvestIncome'] - fin_basic_data3['InvestIncome']
+        ttm_fin_basic_data['NonOperateNetIncome'] = fin_basic_data1['NonOperateNetIncome'] + fin_basic_data2['NonOperateNetIncome'] - fin_basic_data3['NonOperateNetIncome']
+        ttm_fin_basic_data['TotalProfit'] = fin_basic_data1['TotalProfit'] + fin_basic_data2['TotalProfit'] - fin_basic_data3['TotalProfit']
+        ttm_fin_basic_data['NetProfit'] = fin_basic_data1['NetProfit'] + fin_basic_data2['NetProfit'] - fin_basic_data3['NetProfit']
+        ttm_fin_basic_data['DeductedNetProfit'] = fin_basic_data1['DeductedNetProfit'] + fin_basic_data2['DeductedNetProfit'] - fin_basic_data3['DeductedNetProfit']
+        ttm_fin_basic_data['NetOperateCashFlow'] = fin_basic_data1['NetOperateCashFlow'] + fin_basic_data2['NetOperateCashFlow'] - fin_basic_data3['NetOperateCashFlow']
+        return ttm_fin_basic_data
+
+    @classmethod
+    def is_fin_report_date(cls, date):
+        """
+        给定的日期是否为财务报告日期
+        Parameters:
+        --------
+        :param date: datetime-like or str
+            日期
+        :return: bool
+        """
+        date = cls.to_date(date)
+        year = date.year
+        report_dates = [datetime.datetime(year, 3, 31), datetime.datetime(year, 6, 30),
+                        datetime.datetime(year, 9, 30), datetime.datetime(year, 12, 31)]
+        if date in report_dates:
+            return True
+        else:
+            return False
+
+    @classmethod
+    def get_fin_report_date(cls, trading_day):
+        """
+        根据交易日日期返回最新财报的报告期日期
+        Parameters:
+        --------
+        :param trading_day: datetime-like or str
+            交易日期
+        :return: datetime.datetime
+            最新财报的报告期日期
+        --------
+            规则：5、6、7、8月采用年报或一季报数据（年报、一季报4月底全部公告完毕）
+                 9、10月采用中报数据（中报8月底全部公告完毕）
+                 11、12月及下一年1、2、3、4月采用三季报数据（三季报10月底全部公告完毕）
+        """
+        trading_day = cls.to_date(trading_day)
+        year = trading_day.year
+        month = trading_day.month
+        day = trading_day.day
+        if month in (5,6,7,8):
+            month = 3
+            day = 31
+        elif month in (9, 10):
+            month = 6
+            day = 30
+        elif month in (11, 12):
+            month = 9
+            day = 30
+        elif month in (1, 2, 3, 4):
+            year -= 1
+            month = 9
+            day = 30
+        return datetime.datetime(year, month, day)
+
+    @classmethod
     def trading_status(cls, code, trading_day):
         """
         返回个股在指定交易日的交易状态：正常、停牌、涨停、跌停

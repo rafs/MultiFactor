@@ -19,7 +19,7 @@ MKT_MIN_NOFQ = 'ElementaryFactor/mkt_1min_NoFQ'
 # 股本结构数据相对目录
 CAP_STRUCT = 'ElementaryFactor/cap_struct'
 # 主要财务指标相对目录
-FIN_BASIC_DATA_PATH = 'ElementaryFactor/fin_data/find_data_basics'
+FIN_BASIC_DATA_PATH = 'ElementaryFactor/fin_data/fin_data_basics'
 
 # 日行情复权数据的表头
 MKT_DAILY_FQ_HEADER = ['code', 'date', 'open', 'high', 'low', 'close', 'vol', 'amount', 'turnover1', 'turnover2', 'factor']
@@ -43,6 +43,9 @@ USING_PERSISTENCE_TYPE='csv'
 
 # 去极值方法中mad的乘数
 CLEAN_EXTREME_VALUE_MULTI_CONST=5.2
+
+# 财务数据中金额的单位
+FIN_DATA_AMOUNT_UNIT=10000
 
 
 if __name__ == '__main__':

@@ -445,7 +445,7 @@ class Utils(object):
         date = cls.to_date(report_date)
         if not cls.is_fin_report_date(date):
             return None
-        fin_basic_data_path = os.path.join(ct.FIN_BASIC_DATA_PATH, '%s.csv' % code)
+        fin_basic_data_path = os.path.join(ct.DB_PATH, ct.FIN_BASIC_DATA_PATH, '%s.csv' % code)
         df_fin_basic_data = pd.read_csv(fin_basic_data_path, na_values='--', parse_dates=[0],
                                         names=ct.FIN_BASIC_DATA_HEADER, header=0)
         fin_basic_data = df_fin_basic_data[df_fin_basic_data.ReportDate == date]
@@ -497,8 +497,14 @@ class Utils(object):
             date2 = datetime.datetime(date.year-2, 12, 31)
             date3 = datetime.datetime(date.year-2, 9, 30)
         fin_basic_data1 = cls.get_fin_basic_data(code, date1)
+        if fin_basic_data1 is None:
+            return None
         fin_basic_data2 = cls.get_fin_basic_data(code, date2)
+        if fin_basic_data2 is None:
+            return None
         fin_basic_data3 = cls.get_fin_basic_data(code, date3)
+        if fin_basic_data3 is None:
+            return None
         ttm_fin_basic_data = Series()
         ttm_fin_basic_data['ReportDate'] = date1
         ttm_fin_basic_data['MainOperateRevenue'] = fin_basic_data1['MainOperateRevenue'] + fin_basic_data2['MainOperateRevenue'] - fin_basic_data3['MainOperateRevenue']
@@ -611,7 +617,7 @@ class Utils(object):
             return SecuTradingStatus.Suspend
 
     @classmethod
-    def factor_loading_persistent(cls, db_file, str_key, dict_factor_loading):
+    def factor_loading_persistent(cls, db_file, str_key, dict_factor_loading, columns=None):
         """
         持久化因子载荷
         Parameters
@@ -622,6 +628,8 @@ class Utils(object):
             持久化因子载荷时用到的key，一般为日期，格式YYYYMMDD
         :param dict_factor_loading: dict
             因子载荷值
+        :param columns: sequence, 默认=None
+            输出的列，并按指定顺序输出
         :return:
         """
         persistence_type = ct.FACTOR_LOADING_PERSISTENCE_TYPE.split(',')
@@ -635,7 +643,7 @@ class Utils(object):
                     db.close()
             elif perst_type == 'csv':
                 db_file += '_%s.csv' % str_key
-                DataFrame(dict_factor_loading).to_csv(db_file, index=False)
+                DataFrame(dict_factor_loading).to_csv(db_file, index=False, columns=columns)
 
     @classmethod
     def read_factor_loading(cls, db_file, str_key):

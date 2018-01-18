@@ -60,9 +60,13 @@ class Growth(Factor):
         if ttm_fin_data_pre is None:
             return None
         # 计算成长类因子值
-        npg_ttm = ttm_fin_data_latest['DeductedNetProfit']/ttm_fin_data_pre['DeductedNetProfit'] - 1.0
-        opg_ttm = ttm_fin_data_latest['MainOperateRevenue']/ttm_fin_data_pre['MainOperateRevenue'] - 1.0
-        return Series([code, npg_ttm, opg_ttm], index=['id', 'npg_ttm', 'opg_ttm'])
+        if abs(ttm_fin_data_pre['NetProfit']) < 0.1:
+            return None
+        npg_ttm = (ttm_fin_data_latest['NetProfit'] - ttm_fin_data_pre['NetProfit']) / abs(ttm_fin_data_pre['NetProfit'])
+        if abs(ttm_fin_data_pre['MainOperateRevenue']) < 0.1:
+            return None
+        opg_ttm = (ttm_fin_data_latest['MainOperateRevenue'] - ttm_fin_data_pre['MainOperateRevenue']) / abs(ttm_fin_data_pre['MainOperateRevenue'])
+        return Series([code, round(npg_ttm, 4), round(opg_ttm, 4)], index=['id', 'npg_ttm', 'opg_ttm'])
 
     @classmethod
     def _calc_factor_loading_proc(cls, code, calc_date, q):
@@ -80,7 +84,7 @@ class Growth(Factor):
         logging.info('[%s] Calc Growth factor of %s.' % (Utils.datetimelike_to_str(calc_date), code))
         growth = None
         try:
-            value = cls._calc_factor_loading(code, calc_date)
+            growth = cls._calc_factor_loading(code, calc_date)
         except Exception as e:
             print(e)
         if growth is not None:
@@ -120,40 +124,43 @@ class Growth(Factor):
             dict_growth = {'date': [], 'id': [], 'npg_ttm': [], 'opg_ttm': []}
             # 遍历个股，计算个股成长因子载荷
             s = (calc_date - datetime.timedelta(days=90)).strftime('%Y%m%d')
-            stock_basics = all_stock_basics[all_stock_basics.list_date < 1]
+            stock_basics = all_stock_basics[all_stock_basics.list_date < s]
 
             # 采用单进程进行计算成长因子
-            for _, stock_info in stock_basics.iterrows():
-                logging.info("[%s] calc %s's growth factor loading." % (calc_date.strftime('%Y-%m-%d'), stock_info.symbol))
-                growth_data = cls._calc_factor_loading(stock_info.symbol, calc_date)
-                if growth_data is not None:
-                    dict_growth['id'].append(Utils.code_to_symbol(stock_info.symbol))
-                    dict_growth['npg_ttm'].append(growth_data['npg_ttm'])
-                    dict_growth['opg_ttm'].append(growth_data['opg_ttm'])
+            # for _, stock_info in stock_basics.iterrows():
+            #     logging.info("[%s] calc %s's growth factor loading." % (calc_date.strftime('%Y-%m-%d'), stock_info.symbol))
+            #     growth_data = cls._calc_factor_loading(stock_info.symbol, calc_date)
+            #     if growth_data is not None:
+            #         dict_growth['id'].append(Utils.code_to_symbol(stock_info.symbol))
+            #         dict_growth['npg_ttm'].append(growth_data['npg_ttm'])
+            #         dict_growth['opg_ttm'].append(growth_data['opg_ttm'])
 
             # 采用多进程并行计算成长因子
-            # q = Manager().Queue()   # 队列，用于进程间通信，存储每个进程计算的因子载荷
-            # p = Pool(4)             # 进程池，最多同时开启4个进程
-            # for _, stock_info in stock_basics.iterrows():
-            #     p.apply_async(cls._calc_factor_loading_proc, args=(stock_info.symbol, calc_date, q,))
-            # p.close()
-            # p.join()
-            # while not q.empty():
-            #     growth_data = q.get(True)
-            #     dict_growth['id'].append(growth_data['id'])
-            #     dict_growth['npg_ttm'].append(growth_data['npg_ttm'])
-            #     dict_growth['opg_ttm'].append(growth_data['opg_ttm'])
+            q = Manager().Queue()   # 队列，用于进程间通信，存储每个进程计算的因子载荷
+            p = Pool(4)             # 进程池，最多同时开启4个进程
+            for _, stock_info in stock_basics.iterrows():
+                p.apply_async(cls._calc_factor_loading_proc, args=(stock_info.symbol, calc_date, q,))
+            p.close()
+            p.join()
+            while not q.empty():
+                growth_data = q.get(True)
+                dict_growth['id'].append(growth_data['id'])
+                dict_growth['npg_ttm'].append(growth_data['npg_ttm'])
+                dict_growth['opg_ttm'].append(growth_data['opg_ttm'])
 
             date_label = Utils.get_trading_days(start=calc_date, ndays=2)[1]
             dict_growth['date'] = [date_label] * len(dict_growth['id'])
             # 保存因子载荷至因子数据库
             if save:
-                Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_growth)
-            # 休息300秒
-            logging.info('Suspending for 300s.')
-            time.sleep(300)
+                columns = ['date', 'id', 'npg_ttm', 'opg_ttm']
+                Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_growth, columns)
+            # 休息120秒
+            logging.info('Suspending for 120s.')
+            time.sleep(120)
         return dict_growth
 
 
 if __name__ == '__main__':
-    pass
+    # pass
+    Growth._calc_factor_loading('000719', '2012-12-31')
+    # Growth.calc_factor_loading(start_date='2017-01-01', end_date='2017-12-31', month_end=True, save=True)

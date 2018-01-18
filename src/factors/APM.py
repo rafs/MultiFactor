@@ -10,7 +10,12 @@ from src.factors.factor import Factor
 import src.factors.cons as factor_ct
 from src.util.utils import Utils, SecuTradingStatus
 from src.util.dataapi.CDataHandler import CDataHandler
+# from src.factors.Scale import Scale
+# from src.factors.Value import Value
+# from src.factors.Growth import Growth
+# from src.factors.Momentum import Momentum
 import os
+import pandas as pd
 import numpy as np
 from pandas import DataFrame
 from pandas import Series
@@ -27,7 +32,7 @@ logging.basicConfig(level=logging.INFO,
 class APM(Factor):
     """APM因子类"""
     __days = factor_ct.APM_CT.days_num      # 读取过去多少天的分钟行情数据进行因子载荷计算
-    _db_file = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.db_file)      # 因子对应数据库文件名
+    _db_file = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.apm_db_file)      # 因子对应数据库文件名
 
     @classmethod
     def _calc_factor_loading(cls, code, calc_date):
@@ -224,7 +229,8 @@ class APM(Factor):
             assert len(stat_lst) == len(ret20_lst)
             assert len(stat_lst) == len(symbol_lst)
 
-            # 2.2.将统计量stat对动量因子ret20j进行截面回归：stat_j = \beta * Ret20_j + \epsilon_j
+            # 2.2.构建APM因子
+            # 2.2.1.将统计量stat对动量因子ret20j进行截面回归：stat_j = \beta * Ret20_j + \epsilon_j
             #     残差向量即为对应个股的APM因子
             # 截面回归之前，先对stat统计量和动量因子进行去极值和标准化处理
             stat_arr = np.array(stat_lst).reshape((len(stat_lst), 1))
@@ -239,15 +245,73 @@ class APM(Factor):
             apm_result = apm_model.fit()
             apm_lst = list(np.around(apm_result.resid, 6))  # amp因子载荷精确到6位小数
             assert len(apm_lst) == len(symbol_lst)
-            # 2.3.构造APM因子字典，并持久化
+            # 2.2.2.构造APM因子字典，并持久化
             date_label = Utils.get_trading_days(calc_date, ndays=2)[1]
             dict_apm = {'date': [date_label]*len(symbol_lst), 'id': symbol_lst, 'factorvalue': apm_lst}
             if save:
                 Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_apm)
-            # 休息300秒
+
+            # 2.3.构建PureAPM因子
+            # 将stat_arr转换为DataFrame, 此时的stat_arr已经经过了去极值和标准化处理
+            df_stat = DataFrame(stat_arr, index=symbol_lst, columns=['stat'])
+            # 取得提纯的因变量因子
+            df_dependent_factor = cls.get_dependent_factors(calc_date)
+            # 将df_stat和因变量因子拼接
+            df_data = pd.concat([df_stat, df_dependent_factor], axis=1, join='inner')
+            # OLS回归，提纯APM因子
+            arr_data = np.array(df_data)
+            pure_apm_model = sm.OLS(arr_data[:,0], arr_data[:,1:])
+            pure_apm_result = pure_apm_model.fit()
+            pure_apm_lst = list(np.around(pure_apm_result.resid, 6))
+            pure_symbol_lst = list(df_data.index)
+            assert len(pure_apm_lst) == len(pure_symbol_lst)
+            # 构造pure_apm因子字典，并持久化
+            dict_pure_apm = {'date': [date_label]*len(pure_symbol_lst), 'id': pure_symbol_lst, 'factorvalue': pure_apm_lst}
+            pure_apm_db_file = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.pure_apm_db_file)
+            if save:
+                Utils.factor_loading_persistent(pure_apm_db_file, calc_date.strftime('%Y%m%d'), dict_pure_apm)
+            # 休息360秒
             logging.info('Suspended for 360s.')
             time.sleep(360)
         return dict_apm
+
+    # @classmethod
+    # def calc_dependent_factors(cls, code, calc_date):
+    #     """
+    #     计算用于APM因子提纯的相关因子值，包括行业、规模、价值、成长、短期动量、长期动量
+    #     Parameters:
+    #     --------
+    #     :param code: str
+    #         个股代码，如600000或SH600000
+    #     :param calc_date: datetime-like or str
+    #         计算日期，格式：YYYY-MM-DD or YYYYMMDD
+    #     :return: np.array
+    #     --------
+    #         用于APM因子提纯的相关因子向量:
+    #         np.array([申万一级行业哑变量, 规模因子, 价值因子, 成长因子, 短期动量, 长期动量])
+    #     """
+    #     code = Utils.code_to_symbol(code)
+    #     calc_date = Utils.to_date(calc_date)
+    #     # 取得行业分布
+    #     ind_dist = Utils.get_ind_dist(code)
+    #     # 计算规模因子
+    #     scale_factor = Scale._calc_factor_loading(code, calc_date)
+    #     if scale_factor is None:
+    #         return None
+    #     # 计算价值因子
+    #     value_factor = Value._calc_factor_loading(code, calc_date)
+    #     if value_factor is None:
+    #         return None
+    #     # 计算成长因子
+    #     growth_factor = Growth._calc_factor_loading(code, calc_date)
+    #     if growth_factor is None:
+    #         return None
+    #     # 计算动量因子
+    #     momentum_factor = Momentum._calc_factor_loading(code, calc_date)
+    #     if momentum_factor is None:
+    #         return None
+    #     # stack the factor
+    #     return np.array(list(ind_dist + [scale_factor, value_factor, growth_factor, momentum_factor]))
 
 
 def apm_backtest(start, end):
@@ -338,6 +402,6 @@ def apm_backtest(start, end):
 if __name__ == '__main__':
     # pass
     # APM._calc_factor_loading('SZ002558','2015-12-31')
-    # APM.calc_factor_loading('2017-12-29')
+    APM.calc_factor_loading('2012-12-31', save=True)
     # APM.calc_factor_loading(start_date='2017-01-01', end_date='2017-12-31', month_end=True, save=True)
-    apm_backtest('2018-01-01', '2018-01-03')
+    # apm_backtest('2018-01-01', '2018-01-03')

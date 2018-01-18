@@ -572,6 +572,40 @@ class Utils(object):
         return datetime.datetime(year, month, day)
 
     @classmethod
+    def get_ind_dist(cls, code):
+        """
+        读取个股的行业分布
+        Parameters:
+        --------
+        :param code: str
+            个股代码，如600000或SH600000
+        :return: pd.Series
+        --------
+            个股的申万一级行业分布
+            Series的index为行业代码，值为0(个股不属于该行业)或1(个股属于该行业)
+        """
+        code = cls.code_to_symbol(code)
+        # 读取申万一级行业信息表
+        sw_classify_info_path = os.path.join(ct.DB_PATH, ct.INDUSTRY_CLASSIFY_DATA_PATH, 'classify_standard_sw.csv')
+        df_sw_classify = pd.read_csv(sw_classify_info_path, names=ct.SW_INDUSTRY_CLASSIFY_HEADER, header=0)
+        df_sw_classify = df_sw_classify.set_index('ind_code', drop=False)
+        # 读取个股的行业分类信息
+        secu_ind_classify_path = os.path.join(ct.DB_PATH, ct.INDUSTRY_CLASSIFY_DATA_PATH, 'industry_classify_sw.csv')
+        df_secu_ind_classify = pd.read_csv(secu_ind_classify_path,names=['id', 'ind_code', 'ind_name'], header=0)
+        secu_ind = df_secu_ind_classify[df_secu_ind_classify.id == code].iloc[0].ind_code
+        # 构建个股的申万一级行业分布Series
+        secu_ind_dist = df_sw_classify['ind_code'] == secu_ind
+        secu_ind_dist = secu_ind_dist.astype(int)
+        return secu_ind_dist
+
+    @classmethod
+    def get_industry_classify(cls):
+        """读取行业分类数据（申万一级行业）"""
+        sw_classify_data_path = os.path.join(ct.DB_PATH, ct.INDUSTRY_CLASSIFY_DATA_PATH, 'industry_classify_sw.csv')
+        df_ind_classify = pd.read_csv(sw_classify_data_path, names=['id', 'ind_code', 'ind_name'], header=0)
+        return df_ind_classify
+
+    @classmethod
     def trading_status(cls, code, trading_day):
         """
         返回个股在指定交易日的交易状态：正常、停牌、涨停、跌停
@@ -646,7 +680,7 @@ class Utils(object):
                 DataFrame(dict_factor_loading).to_csv(db_file, index=False, columns=columns)
 
     @classmethod
-    def read_factor_loading(cls, db_file, str_key):
+    def read_factor_loading(cls, db_file, str_key, nan_value=None):
         """
         从因子载荷持久化文件中读取指定str_key的因子载荷值
         Parameters
@@ -655,6 +689,8 @@ class Utils(object):
             因子载荷数据文件，绝对路径
         :param str_key: str
             键值，一般为日期，格式为YYYYMMDD
+        :param nan_value: object, 默认为None
+            如果不为None，那么缺失值用nan_value替换
         :return: DataFrame，因子载荷
         --------
             DataFrame:
@@ -677,6 +713,8 @@ class Utils(object):
             df_factor_loading = pd.read_csv(db_file, header=0)
         else:
             df_factor_loading = DataFrame()
+        if nan_value is not None:
+            df_factor_loading = df_factor_loading.fillna(nan_value)
         return df_factor_loading
 
     @classmethod
@@ -693,7 +731,7 @@ class Utils(object):
         m = np.median(raw_data, axis=0)     # 原始数据的中位数
         mad = np.median(np.fabs(raw_data - m), axis=0)
         fupper = m + mad * ct.CLEAN_EXTREME_VALUE_MULTI_CONST
-        flower = m - mad - ct.CLEAN_EXTREME_VALUE_MULTI_CONST
+        flower = m - mad * ct.CLEAN_EXTREME_VALUE_MULTI_CONST
         for k in range(raw_data.shape[1]):
             if method == 'MAD':
                 raw_data[:, k][raw_data[:, k] > fupper[k]] = fupper[k]
@@ -916,5 +954,7 @@ if __name__ == '__main__':
     # print(mkt)
     # print(mkt.shape)
     # Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/SmartQ')
-    df = ts.get_industry_classified('sw')
-    print(df.head())
+    # df = ts.get_industry_classified('sw')
+    # print(df.head())
+    secu_ind_dist = Utils.get_ind_dist('600000')
+    print(secu_ind_dist)

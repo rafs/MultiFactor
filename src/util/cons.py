@@ -20,6 +20,8 @@ MKT_MIN_NOFQ = 'ElementaryFactor/mkt_1min_NoFQ'
 CAP_STRUCT = 'ElementaryFactor/cap_struct'
 # 主要财务指标相对目录
 FIN_BASIC_DATA_PATH = 'ElementaryFactor/fin_data/fin_data_basics'
+# 个股行业分类相对目录
+INDUSTRY_CLASSIFY_DATA_PATH = 'ElementaryFactor/industry_classify'
 
 # 日行情复权数据的表头
 MKT_DAILY_FQ_HEADER = ['code', 'date', 'open', 'high', 'low', 'close', 'vol', 'amount', 'turnover1', 'turnover2', 'factor']
@@ -35,6 +37,9 @@ FIN_BASIC_DATA_HEADER = ['ReportDate', 'BasicEPS', 'UnitNetAsset', 'UnitNetOpera
                          'MainOperateProfit', 'OperateProfit', 'InvestIncome', 'NonOperateNetIncome', 'TotalProfit',
                          'NetProfit', 'DeductedNetProfit', 'NetOperateCashFlow', 'CashEquivalentsChg', 'TotalAsset',
                          'CurrentAsset', 'TotalLiability', 'CurrentLiability', 'ShareHolderEquity', 'ROE']
+
+# 申万行业分类信息表头
+SW_INDUSTRY_CLASSIFY_HEADER = ['ind_code', 'ind_name']
 
 # 因子载荷文件持久化形式
 FACTOR_LOADING_PERSISTENCE_TYPE='shelve,csv'

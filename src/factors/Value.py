@@ -166,9 +166,9 @@ class Value(Factor):
             if save:
                 columns=['date', 'id', 'ep_ttm', 'bp_lr', 'ocf_ttm']
                 Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_value, columns)
-            # 休息300秒
-            logging.info('Suspending for 300s.')
-            time.sleep(300)
+            # 休息120秒
+            logging.info('Suspending for 120s.')
+            time.sleep(120)
         return dict_value
 
 
@@ -176,5 +176,5 @@ class Value(Factor):
 if __name__ == '__main__':
     # pass
     # Value._calc_factor_loading('000800', '2012-12-31')
-    Value.calc_factor_loading(start_date='2013-01-01', end_date='2013-12-31', month_end=True, save=True)
+    Value.calc_factor_loading(start_date='2017-01-01', end_date='2017-12-31', month_end=True, save=True)
 

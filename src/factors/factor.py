@@ -154,4 +154,4 @@ class Factor(object):
 
 if __name__ == '__main__':
     # pass
-    Factor.get_dependent_factors('2012-12-31')
+    Factor.get_dependent_factors('2016-02-29')

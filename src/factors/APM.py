@@ -260,7 +260,7 @@ class APM(Factor):
             df_data = pd.concat([df_stat, df_dependent_factor], axis=1, join='inner')
             # OLS回归，提纯APM因子
             arr_data = np.array(df_data)
-            pure_apm_model = sm.OLS(arr_data[:,0], arr_data[:,1:])
+            pure_apm_model = sm.OLS(arr_data[:, 0], arr_data[:, 1:])
             pure_apm_result = pure_apm_model.fit()
             pure_apm_lst = list(np.around(pure_apm_result.resid, 6))
             pure_symbol_lst = list(df_data.index)
@@ -402,6 +402,6 @@ def apm_backtest(start, end):
 if __name__ == '__main__':
     # pass
     # APM._calc_factor_loading('SZ002558','2015-12-31')
-    APM.calc_factor_loading('2012-12-31', save=True)
-    # APM.calc_factor_loading(start_date='2017-01-01', end_date='2017-12-31', month_end=True, save=True)
+    # APM.calc_factor_loading('2012-12-31', save=True)
+    APM.calc_factor_loading(start_date='2016-02-01', end_date='2016-12-31', month_end=True, save=True)
     # apm_backtest('2018-01-01', '2018-01-03')

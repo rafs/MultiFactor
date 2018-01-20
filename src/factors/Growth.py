@@ -56,7 +56,11 @@ class Growth(Factor):
         if ttm_fin_data_latest is None:
             return None
         # 读取去年同期TTM财务数据
-        ttm_fin_data_pre = Utils.get_ttm_fin_basic_data(code, datetime.datetime(calc_date.year-1, calc_date.month, calc_date.day))
+        try:
+            pre_date = datetime.datetime(calc_date.year-1, calc_date.month, calc_date.day)
+        except ValueError:
+            pre_date = calc_date - datetime.timedelta(days=366)
+        ttm_fin_data_pre = Utils.get_ttm_fin_basic_data(code, pre_date)
         if ttm_fin_data_pre is None:
             return None
         # 计算成长类因子值
@@ -162,5 +166,5 @@ class Growth(Factor):
 
 if __name__ == '__main__':
     # pass
-    Growth._calc_factor_loading('000719', '2012-12-31')
-    # Growth.calc_factor_loading(start_date='2017-01-01', end_date='2017-12-31', month_end=True, save=True)
+    Growth._calc_factor_loading('603818', '2016-02-29')
+    # Growth.calc_factor_loading(start_date='2016-02-01', end_date='2016-02-29', month_end=True, save=True)

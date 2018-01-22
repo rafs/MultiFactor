@@ -767,8 +767,8 @@ class Utils(object):
             1: port_nav, 截止start_date日期前组合最新的净值数据
         """
         start_date = cls.to_date(start_date)
-        port_data = DataFrame()
-        port_nav = DataFrame()
+        port_data = None
+        port_nav = None
         # 遍历backtest_path文件夹下的文件，读取截止start_date日期前组合最新的持仓数据及净值数据
         port_data_dates = []
         for backtest_file in os.listdir(backtest_path):
@@ -953,8 +953,8 @@ if __name__ == '__main__':
     # mkt = Utils.get_secu_daily_mkt('600827', '2015-03-05', range_lookup=False)
     # print(mkt)
     # print(mkt.shape)
-    # Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/SmartQ')
+    Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/PureAPM')
     # df = ts.get_industry_classified('sw')
     # print(df.head())
-    secu_ind_dist = Utils.get_ind_dist('600000')
-    print(secu_ind_dist)
+    # secu_ind_dist = Utils.get_ind_dist('600000')
+    # print(secu_ind_dist)

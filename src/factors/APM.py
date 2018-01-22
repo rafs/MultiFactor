@@ -314,7 +314,7 @@ class APM(Factor):
     #     return np.array(list(ind_dist + [scale_factor, value_factor, growth_factor, momentum_factor]))
 
 
-def apm_backtest(start, end):
+def apm_backtest(start, end, pure_factor=False):
     """
     APM因子的历史回测
     Parameters:
@@ -323,13 +323,18 @@ def apm_backtest(start, end):
         回测开始日期，格式：YYYY-MM-DD，开始日期应该为月初的前一个交易日，即月末交易日
     :param end: datetime-like, str
         回测结束日期，格式：YYYY-MM-DD
+    :param pure_factor: bool, 默认False
+        是否是对纯净因子做回测
     :return:
     """
     # 取得开始结束日期间的交易日数据
     trading_days = Utils.get_trading_days(start, end)
     # 读取截止开始日期前最新的组合回测数据
     prev_trading_day = Utils.get_prev_n_day(trading_days.iloc[0], 1)
-    backtest_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.backtest_path)
+    if pure_factor:
+        backtest_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.pure_backtest_path)
+    else:
+        backtest_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.backtest_path)
     factor_data, port_nav = Utils.get_backtest_data(backtest_path, trading_days.iloc[0])
     # factor_data = None  # 记录每次调仓时最新入选个股的APM因子信息,pd.DataFrame<date,factorvalue,id,buyprice>
     if port_nav is None:
@@ -356,7 +361,11 @@ def apm_backtest(start, end):
                 interval_ret /= float(len(factor_data))
                 nav *= (1.0 + interval_ret)
             # 读取factor_data
-            factor_data = Utils.read_factor_loading(APM.get_db_file(), Utils.datetimelike_to_str(prev_trading_day, False))
+            if pure_factor:
+                factor_data_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.pure_apm_db_file)
+            else:
+                factor_data_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.apm_db_file)
+            factor_data = Utils.read_factor_loading(factor_data_path, Utils.datetimelike_to_str(prev_trading_day, False))
             # 遍历factor_data，剔除在调仓日没有正常交易（如停牌）、及涨停的个股
             ind_to_be_delted = []
             for ind, factor_info in factor_data.iterrows():
@@ -378,8 +387,12 @@ def apm_backtest(start, end):
             interval_ret /= float(len(factor_data))
             nav *= (1.0 + interval_ret)
             # 保存factor_data
-            port_data_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.backtest_path,
-                                          'port_data_%s.csv' % Utils.datetimelike_to_str(trading_day, False))
+            if pure_factor:
+                port_data_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.pure_backtest_path,
+                                              'port_data_%s.csv' % Utils.datetimelike_to_str(trading_day, False))
+            else:
+                port_data_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.backtest_path,
+                                              'port_data_%s.csv' % Utils.datetimelike_to_str(trading_day, False))
             factor_data.to_csv(port_data_path, index=False)
         else:
             # 非调仓日，对组合进行估值
@@ -395,7 +408,10 @@ def apm_backtest(start, end):
         # 设置prev_trading_day
         prev_trading_day = trading_day
     # 保存port_nav
-    port_nav_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.backtest_path, 'port_nav.csv')
+    if pure_factor:
+        port_nav_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.pure_backtest_path, 'port_nav.csv')
+    else:
+        port_nav_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.APM_CT.backtest_path, 'port_nav.csv')
     port_nav.to_csv(port_nav_path, index=False)
 
 
@@ -403,5 +419,5 @@ if __name__ == '__main__':
     # pass
     # APM._calc_factor_loading('SZ002558','2015-12-31')
     # APM.calc_factor_loading('2012-12-31', save=True)
-    APM.calc_factor_loading(start_date='2016-02-01', end_date='2016-12-31', month_end=True, save=True)
-    # apm_backtest('2018-01-01', '2018-01-03')
+    # APM.calc_factor_loading(start_date='2017-11-01', end_date='2017-12-31', month_end=True, save=True)
+    apm_backtest('2015-01-01', '2018-01-03', pure_factor=True)

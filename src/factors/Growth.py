@@ -95,7 +95,7 @@ class Growth(Factor):
             q.put(growth)
 
     @classmethod
-    def calc_factor_loading(cls, start_date, end_date=None, month_end=True, save=False):
+    def calc_factor_loading(cls, start_date, end_date=None, month_end=True, save=False, **kwargs):
         """
         计算指定日期的样本个股的因子载荷，并保存至因子数据库
         Parameters:

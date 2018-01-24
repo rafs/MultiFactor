@@ -11,8 +11,9 @@ from src.factors.factor import Factor
 import src.factors.cons as factor_ct
 from src.util.utils import Utils
 from src.util.dataapi.CDataHandler import CDataHandler
-# import pandas as pd
+import pandas as pd
 from pandas import DataFrame, Series
+import numpy as np
 import os
 import math
 import datetime
@@ -146,7 +147,7 @@ class IntradayMomentum(Factor):
                    momentum_data.m3, momentum_data.m4, momentum_data.m_normal))
 
     @classmethod
-    def calc_factor_loading(cls, start_date, end_date=None, month_end=True, save=False):
+    def calc_factor_loading(cls, start_date, end_date=None, month_end=True, save=False, **kwargs):
         """
         计算指定日期的样本个股的因子载荷，并保存至因子数据库
         Parameters
@@ -159,6 +160,8 @@ class IntradayMomentum(Factor):
             如果为True，则只计算月末时点的因子载荷
         :param save: bool，默认False
             是否保存至因子数据库
+        :param kwargs['synthetic_factor']: bool, 默认为False
+            是否计算合成因子
         :return: 因子载荷，DataFrame
         --------
             因子载荷，DataFrame
@@ -184,53 +187,108 @@ class IntradayMomentum(Factor):
         for calc_date in trading_days_series:
             if month_end and (not Utils.is_month_end(calc_date)):
                 continue
-            dict_intraday_momentum = {'date': [], 'id': [], 'm0': [], 'm1': [],
-                                      'm2': [], 'm3': [], 'm4': [], 'm_normal': []}
-            # 遍历个股，计算个股日内动量值
-            s = (calc_date - datetime.timedelta(days=90)).strftime('%Y%m%d')
-            stock_basics = all_stock_basics[all_stock_basics.list_date < s]
+            logging.info('[%s] calc synthetic intraday momentum factor loading.' % Utils.datetimelike_to_str(calc_date))
+            if 'synthetic_factor' in kwargs and kwargs['synthetic_factor']:     # 计算日内合成动量因子
+                dict_intraday_momentum = {'date': [], 'id': [], 'factorvalue': []}
+                # 读取日内个时段动量因子值
+                df_factor_loading = Utils.read_factor_loading(cls._db_file, Utils.datetimelike_to_str(calc_date, False))
+                if df_factor_loading.shape[0] <= 0:
+                    logging.info("[%s] It doesn't exist intraday momentum factor loading." % Utils.datetimelike_to_str(calc_date))
+                    return
+                df_factor_loading.fillna(0, inplace=True)
+                # 读取因子最优权重
+                factor_weight = cls.get_factor_weight(calc_date)
+                if factor_weight is None:
+                    logging.info("[%s] It doesn't exist factor weight.")
+                    return
+                # 计算合成动量因子
+                arr_factor_loading = np.array(df_factor_loading[['m0', 'm1', 'm2', 'm3', 'm4']])
+                arr_factor_weight = np.array(factor_weight.drop('date')).reshape((5, 1))
+                arr_synthetic_factor = np.dot(arr_factor_loading, arr_factor_weight)
+                # arr_synthetic_factor = np.around(arr_synthetic_factor, 6)
+                dict_intraday_momentum['date'] = list(df_factor_loading['date'])
+                dict_intraday_momentum['id'] = list(df_factor_loading['id'])
+                dict_intraday_momentum['factorvalue'] = list(arr_synthetic_factor.astype(float).round(6).reshape((arr_synthetic_factor.shape[0],)))
+                # 保存合成因子
+                if save:
+                    synthetic_db_file = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.INTRADAYMOMENTUM_CT.synthetic_db_file)
+                    Utils.factor_loading_persistent(synthetic_db_file, Utils.datetimelike_to_str(calc_date, False), dict_intraday_momentum)
+            else:   # 计算日内各时段动量因子
+                dict_intraday_momentum = {'date': [], 'id': [], 'm0': [], 'm1': [],
+                                          'm2': [], 'm3': [], 'm4': [], 'm_normal': []}
+                # 遍历个股，计算个股日内动量值
+                s = (calc_date - datetime.timedelta(days=90)).strftime('%Y%m%d')
+                stock_basics = all_stock_basics[all_stock_basics.list_date < s]
 
-            # 采用单进程进行计算
-            # for _, stock_info in stock_basics.iterrows():
-            #     momentum_data = cls._calc_factor_loading(stock_info.symbol, calc_date)
-            #     if momentum_data is not None:
-            #         logging.info("[%s] %s's intraday momentum = (%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f)" % (calc_date.strftime('%Y-%m-%d'),stock_info.symbol, momentum_data.m0, momentum_data.m1, momentum_data.m2, momentum_data.m3, momentum_data.m4, momentum_data.m_normal))
-            #         dict_intraday_momentum['id'].append(Utils.code_to_symbol(stock_info.symbol))
-            #         dict_intraday_momentum['m0'].append(round(momentum_data.m0, 6))
-            #         dict_intraday_momentum['m1'].append(round(momentum_data.m1, 6))
-            #         dict_intraday_momentum['m2'].append(round(momentum_data.m2, 6))
-            #         dict_intraday_momentum['m3'].append(round(momentum_data.m3, 6))
-            #         dict_intraday_momentum['m4'].append(round(momentum_data.m4, 6))
-            #         dict_intraday_momentum['m_normal'].append(round(momentum_data.m_normal, 6))
+                # 采用单进程进行计算
+                # for _, stock_info in stock_basics.iterrows():
+                #     momentum_data = cls._calc_factor_loading(stock_info.symbol, calc_date)
+                #     if momentum_data is not None:
+                #         logging.info("[%s] %s's intraday momentum = (%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f)" % (calc_date.strftime('%Y-%m-%d'),stock_info.symbol, momentum_data.m0, momentum_data.m1, momentum_data.m2, momentum_data.m3, momentum_data.m4, momentum_data.m_normal))
+                #         dict_intraday_momentum['id'].append(Utils.code_to_symbol(stock_info.symbol))
+                #         dict_intraday_momentum['m0'].append(round(momentum_data.m0, 6))
+                #         dict_intraday_momentum['m1'].append(round(momentum_data.m1, 6))
+                #         dict_intraday_momentum['m2'].append(round(momentum_data.m2, 6))
+                #         dict_intraday_momentum['m3'].append(round(momentum_data.m3, 6))
+                #         dict_intraday_momentum['m4'].append(round(momentum_data.m4, 6))
+                #         dict_intraday_momentum['m_normal'].append(round(momentum_data.m_normal, 6))
 
-            # 采用多进程并行计算日内动量因子载荷
-            q = Manager().Queue()   # 队列，用于进程间通信，存储每个进程计算的因子载荷
-            p = Pool(4)             # 进程池，最多同时开启4个进程
-            for _, stock_info in stock_basics.iterrows():
-                p.apply_async(cls._calc_factor_loading_proc, args=(stock_info.symbol, calc_date, q,))
-            p.close()
-            p.join()
-            while not q.empty():
-                momentum_data = q.get(True)
-                dict_intraday_momentum['id'].append(momentum_data[0])
-                dict_intraday_momentum['m0'].append(round(momentum_data[1], 6))
-                dict_intraday_momentum['m1'].append(round(momentum_data[2], 6))
-                dict_intraday_momentum['m2'].append(round(momentum_data[3], 6))
-                dict_intraday_momentum['m3'].append(round(momentum_data[4], 6))
-                dict_intraday_momentum['m4'].append(round(momentum_data[5], 6))
-                dict_intraday_momentum['m_normal'].append(round(momentum_data[6], 6))
+                # 采用多进程并行计算日内动量因子载荷
+                q = Manager().Queue()   # 队列，用于进程间通信，存储每个进程计算的因子载荷
+                p = Pool(4)             # 进程池，最多同时开启4个进程
+                for _, stock_info in stock_basics.iterrows():
+                    p.apply_async(cls._calc_factor_loading_proc, args=(stock_info.symbol, calc_date, q,))
+                p.close()
+                p.join()
+                while not q.empty():
+                    momentum_data = q.get(True)
+                    dict_intraday_momentum['id'].append(momentum_data[0])
+                    dict_intraday_momentum['m0'].append(round(momentum_data[1], 6))
+                    dict_intraday_momentum['m1'].append(round(momentum_data[2], 6))
+                    dict_intraday_momentum['m2'].append(round(momentum_data[3], 6))
+                    dict_intraday_momentum['m3'].append(round(momentum_data[4], 6))
+                    dict_intraday_momentum['m4'].append(round(momentum_data[5], 6))
+                    dict_intraday_momentum['m_normal'].append(round(momentum_data[6], 6))
 
-            date_label = Utils.get_trading_days(calc_date, ndays=2)[1]
-            dict_intraday_momentum['date'] = [date_label] * len(dict_intraday_momentum['id'])
-            # 保存因子载荷至因子数据库
-            if save:
-                Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_intraday_momentum)
-            # 休息360秒
-            logging.info('Suspending for 360s.')
-            time.sleep(360)
+                date_label = Utils.get_trading_days(calc_date, ndays=2)[1]
+                dict_intraday_momentum['date'] = [date_label] * len(dict_intraday_momentum['id'])
+                # 保存因子载荷至因子数据库
+                if save:
+                    Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_intraday_momentum)
+                # 休息360秒
+                logging.info('Suspending for 360s.')
+                time.sleep(360)
         return dict_intraday_momentum
+
+    @classmethod
+    def get_factor_weight(cls, date):
+        """
+        取得日内各时点动量因子的权重
+        --------
+        :param date: datetime-like or str
+            日期
+        :return: pd.Series
+            各时点权重信息
+        --------
+            0. date: 日期
+            1. w0: 第一个时点动量因子的权重
+            2. w1: 第二个时点动量因子的权重
+            3. w2: 第三个时点动量因子的权重
+            4. w3: 第四个时点动量因子的权重
+            5. w4: 第五个时点动量因子的权重
+            读取不到数据，返回None
+        """
+        date = Utils.to_date(date)
+        weight_file_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.INTRADAYMOMENTUM_CT.optimal_weight_file)
+        df_optimal_weight = pd.read_csv(weight_file_path, parse_dates=[0], header=0)
+        df_optimal_weight.sort_values(by='date', inplace=True)
+        df_optimal_weight = df_optimal_weight[df_optimal_weight.date <= date]
+        if df_optimal_weight.shape[0] > 0:
+            return df_optimal_weight.iloc[-1]
+        else:
+            return None
 
 
 if __name__ == '__main__':
     # pass
-    IntradayMomentum.calc_factor_loading(start_date='2017-04-01', end_date='2017-12-31', month_end=True, save=True)
+    IntradayMomentum.calc_factor_loading(start_date='2013-01-01', end_date='2017-12-31', month_end=True, save=True, synthetic_factor=True)

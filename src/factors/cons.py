@@ -24,7 +24,9 @@ APM_CT = DottableDict({'index_code': '000001',                              # �
                        })
 # IntradayMementum因子的配置参数
 INTRADAYMOMENTUM_CT = DottableDict({'days_num': 20,                                             # 计算因子载荷所需分钟行情的天数
-                                    'db_file': 'Momentum/IntradayMomentum/IntradayMomentum',    # 因子载荷的保存文件路径名（相对于因子数据库根目录的相对路径）
+                                    'db_file': 'Momentum/IntradayMomentum/IntradayMomentum',    # 日内时点动量因子载荷的保存文件路径名（相对于因子数据库根目录的相对路径）
+                                    'synthetic_db_file': 'Momentum/IntradayMomentum/SyntheticMomentum',     # 合成动量因子保存文件的相对路径
+                                    'optimal_weight_file': 'Momentum/IntradayMomentum/optimal_weight.csv',  # 日内因子最优权重文件相对路径
                                     'backtest_path': 'FactorBackTest/IntradayMomentum'          # 历史回测结果文件的保存路径（相对于因子数据库根目录的相对路径）
                                     })
 # 规模因子的配置参数

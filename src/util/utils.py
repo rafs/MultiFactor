@@ -937,7 +937,7 @@ if __name__ == '__main__':
     # ret = Utils.calc_interval_ret('600000', start=datetime.datetime.strptime('2016-01-01', '%Y-%m-%d'), end='2016-10-16')
     # print('ret = %0.4f' % ret)
     # test get_trading_days
-    trading_days = Utils.get_trading_days(start=datetime.datetime.strptime('2017-01-01', '%Y-%m-%d'), end='20171031', ndays=10)
+    # trading_days = Utils.get_trading_days(start=datetime.datetime.strptime('2017-01-01', '%Y-%m-%d'), end='20171031', ndays=10)
     # print(len(trading_days))
     # trading_days = Utils.get_trading_days(start=pd.Timestamp('2017-01-01'), end='2017-10-31', ndays=10)
     # print(len(trading_days))
@@ -953,7 +953,7 @@ if __name__ == '__main__':
     # mkt = Utils.get_secu_daily_mkt('600827', '2015-03-05', range_lookup=False)
     # print(mkt)
     # print(mkt.shape)
-    Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/PureAPM')
+    Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/IntradayMomentum')
     # df = ts.get_industry_classified('sw')
     # print(df.head())
     # secu_ind_dist = Utils.get_ind_dist('600000')

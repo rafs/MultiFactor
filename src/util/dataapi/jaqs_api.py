@@ -9,6 +9,7 @@
 from jaqs.data.dataapi import DataApi
 import src.util.dataapi.cons as ct
 from src.util.dataapi.CDataApi import CDataApi
+from src.util.utils import Utils
 
 class JaqsApi(CDataApi):
     # 登录jaqs接口
@@ -42,6 +43,37 @@ class JaqsApi(CDataApi):
         df_basics.symbol = df_basics.symbol.map(lambda x: x.split('.')[0])
         return df_basics
 
+    @classmethod
+    def download_index_cons(cls, idx_code, start_date, end_date):
+        """
+        下载指数成分股数据
+        Parameters:
+        --------
+        :param idx_code: str
+            指数代码，格式600000
+        :param start_date: datetime-like, str
+            开始日期
+        :param end_date: datetime-like, str
+            结束日期
+        :return: bool
+            下载成功返回True, 否则返回False
+        """
+        code = Utils.code_to_tssymbol(idx_code, True)
+        start = Utils.datetimelike_to_str(start_date, False)
+        end = Utils.datetimelike_to_str(end_date, False)
+        df_idx_cons, msg = cls._api.query(view='lb.indexCons',
+                                          fields='',
+                                          filter='index_code=%s&start_date=%s&end_date=%s' % (code, start, end),
+                                          data_format='pandas')
+        if msg != '0,':
+            return False
+        else:
+
+            file_path = '/Volumes/DB/FactorDB/ElementaryFactor/index_cons/%s.csv' % idx_code
+            df_idx_cons.sort_values(by='in_date').to_csv(file_path, index=False)
+            return True
+
 
 if __name__ == '__main__':
-    pass
+    import datetime
+    JaqsApi.download_index_cons('000985', '20050101', datetime.date.today().strftime('%Y%m%d'))

@@ -9,7 +9,7 @@
 
 from src.factors.factor import Factor
 import src.factors.cons as factor_ct
-from src.util.utils import Utils
+from src.util.utils import Utils, SecuTradingStatus
 from src.util.dataapi.CDataHandler import CDataHandler
 import pandas as pd
 from pandas import DataFrame, Series
@@ -289,6 +289,92 @@ class IntradayMomentum(Factor):
             return None
 
 
+def mom_backtest(start, end):
+    """
+    日内动量因子历史回测
+    Parameters:
+    --------
+    :param start: datetime-like, str
+        回测开始日期，格式YYYY-MM-DD or YYYYMMDD
+    :param end: datetime-like, str
+        回测结束日期，格式：YYYY-MM-DD or YYYYMMDD
+    :return:
+    """
+    # 取得开始、结束日期之间的交易日序列
+    trading_days = Utils.get_trading_days(start, end)
+    # 读取截止开始日期前最新的组合回测数据
+    prev_trading_day = Utils.get_prev_n_day(trading_days.iloc[0], 1)
+    backtest_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.INTRADAYMOMENTUM_CT.backtest_path)
+    factor_data, port_nav = Utils.get_backtest_data(backtest_path, trading_days.iloc[0])
+    if port_nav is None:
+        port_nav = DataFrame({'date': [prev_trading_day.strftime('%Y-%m-%d')], 'nav': [1.0]})
+    # 遍历交易日，如果是月初，则读取动量因子载荷值；如果不是月初，则进行组合估值
+    for trading_day in trading_days:
+        if factor_data is None:
+            nav = port_nav[port_nav.date == prev_trading_day.strftime('%Y-%m-%d')].iloc[0].nav
+        else:
+            nav = port_nav[port_nav.date == factor_data.iloc[0].date].iloc[0].nav
+        interval_ret = 0.0
+        # 月初进行调仓
+        if Utils.is_month_start(trading_day):
+            logging.info('[%s] 月初调仓.' % Utils.datetimelike_to_str(trading_day, True))
+            # 调仓前，先计算按均价卖出原先组合个股在当天的组合nav
+            if factor_data is not None:
+                for ind, factor_info in factor_data.iterrows():
+                    daily_mkt = Utils.get_secu_daily_mkt(factor_info.id, trading_day, fq=True, range_lookup=True)
+                    if daily_mkt.date == trading_day.strftime('%Y-%m-%d'):
+                        vwap_price = daily_mkt.amount / daily_mkt.vol * daily_mkt.factor
+                    else:
+                        vwap_price = daily_mkt.close
+                    interval_ret += vwap_price / factor_info.buyprice - 1.0
+                interval_ret /= float(len(factor_data))
+                nav *= (1.0 + interval_ret)
+            # 读取factor_data
+            factor_data_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.INTRADAYMOMENTUM_CT.synthetic_db_file)
+            factor_data = Utils.read_factor_loading(factor_data_path, Utils.datetimelike_to_str(prev_trading_day, False))
+            # 遍历factor_data，剔除在调仓日期没有正常交易（如停牌）、及涨停的个股
+            ind_to_be_deleted = []
+            for ind, factor_info in factor_data.iterrows():
+                trading_status = Utils.trading_status(factor_info.id, trading_day)
+                if trading_status == SecuTradingStatus.Suspend or trading_status == SecuTradingStatus.LimitUp:
+                    ind_to_be_deleted.append(ind)
+            factor_data = factor_data.drop(ind_to_be_deleted, axis=0)
+            # 对factor_data按因子值升序排列，取前10%个股
+            factor_data = factor_data.sort_values(by='factorvalue', ascending=True)
+            factor_data = factor_data.iloc[:int(len(factor_data)*0.1)]
+            # 遍历factor_data，添加买入价格，并估值计算当天调仓后的组合收益
+            factor_data['buyprice'] = 0.0
+            interval_ret = 0.0
+            for ind, factor_info in factor_data.iterrows():
+                daily_mkt = Utils.get_secu_daily_mkt(factor_info.id, trading_day, fq=True, range_lookup=False)
+                assert len(daily_mkt) > 0
+                factor_data.loc[ind, 'buyprice'] = daily_mkt.amount / daily_mkt.vol * daily_mkt.factor
+                interval_ret += daily_mkt.close / factor_data.loc[ind, 'buyprice'] - 1.0
+            interval_ret /= float(len(factor_data))
+            nav *= (1.0 + interval_ret)
+            # 保存factor_data
+            port_data_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.INTRADAYMOMENTUM_CT.backtest_path,
+                                          'port_data_%s.csv' % Utils.datetimelike_to_str(trading_day, False))
+            factor_data.to_csv(port_data_path, index=False)
+        else:
+            # 非调仓日，对组合进行估值
+            logging.info('[%s] 月中估值.' % Utils.datetimelike_to_str(trading_day, True))
+            if factor_data is not None:
+                for ind, factor_info in factor_data.iterrows():
+                    daily_mkt = Utils.get_secu_daily_mkt(factor_info.id, trading_day, fq=True, range_lookup=True)
+                    interval_ret += daily_mkt.close / factor_info.buyprice - 1.0
+                interval_ret /= float(len(factor_data))
+                nav *= (1.0 + interval_ret)
+        # 添加nav
+        port_nav = port_nav.append(Series({'date': trading_day.strftime('%Y-%m-%d'), 'nav': nav}), ignore_index=True)
+        # 设置prev_trading_day
+        prev_trading_day = trading_day
+    # 保存port_nav
+    port_nav_path = os.path.join(factor_ct.FACTOR_DB.db_path, factor_ct.INTRADAYMOMENTUM_CT.backtest_path, 'port_nav.csv')
+    port_nav.to_csv(port_nav_path, index=False)
+
+
 if __name__ == '__main__':
     # pass
-    IntradayMomentum.calc_factor_loading(start_date='2013-01-01', end_date='2017-12-31', month_end=True, save=True, synthetic_factor=True)
+    # IntradayMomentum.calc_factor_loading(start_date='2013-01-01', end_date='2017-12-31', month_end=True, save=True, synthetic_factor=True)
+    mom_backtest('2013-01-04', '2017-12-31')

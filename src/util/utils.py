@@ -217,17 +217,19 @@ class Utils(object):
                 return True
 
     @classmethod
-    def get_secu_daily_mkt(cls, secu_code, start, end=None, fq=False, range_lookup=False):
+    def get_secu_daily_mkt(cls, secu_code, start=None, end=None, ndays=None,fq=False, range_lookup=False):
         """
         读取证券的日行情数据
         Parameters
         --------
         :param secu_code: str
-            证券代码，e.g. 600000
+            证券代码，e.g. 600000 or SH600000
         :param start: datetime-like, str
             开始日期，格式：YYYY-MM-DD
         :param end: datetime-like, str，默认None
-            结束日期，格式：YYYY-MM-DD；当end=None时，只取start一天的行情数据
+            结束日期，格式：YYYY-MM-DD；当end=None & ndays=None时，只取start一天的行情数据
+        :param ndays: int, 默认None
+            行情天数
         :param fq: bool，默认False
             是否读取复权行情数据
         :param range_lookup: bool，默认False
@@ -236,8 +238,10 @@ class Utils(object):
             当range_lookup=True，如果start没有行情数据时，返回start之前最近一个交易日行情数据.
         :return:
         --------
-            1.如果end=None，返回Series
-            2.如果end!=None，返回DataFrame
+            1. 指定开始、结束日期, 即start和end不为None, 此时忽略ndays, 返回pd.DataFrame
+            2. 指定开始日期和天数, 即start和ndays不为None、而end为None, 返回pd.DataFrame
+            3. 指定结束日期和天数, 即end和ndays不为None、而start为None, 返回pd.DataFrame
+            4. 仅指定开始日期, 即start不为None、而end和ndays为None, 返回pd.Series
             code    证券代码
             date    日期
             open    开盘价
@@ -253,15 +257,27 @@ class Utils(object):
         symbol = _code_to_symbol(secu_code)
         if fq:
             file_path = '%s.csv' % os.path.join(ct.DB_PATH, ct.MKT_DAILY_FQ, symbol)
+            if not os.path.exists(file_path):
+                return None
             df_mkt = pd.read_csv(file_path, names=ct.MKT_DAILY_FQ_HEADER, header=0)
         else:
             file_path = '%s.csv' % os.path.join(ct.DB_PATH, ct.MKT_DAILY_NOFQ, symbol)
+            if not os.path.exists(file_path):
+                return None
             df_mkt = pd.read_csv(file_path, names=ct.MKT_DAILY_NOFQ_HEADER, header=0)
-        start = cls.datetimelike_to_str(start, dash=True)
+        if len(df_mkt) == 0:
+            return None
+        if start is not None:
+            start = cls.datetimelike_to_str(start, dash=True)
         if end is not None:
             end = cls.datetimelike_to_str(end, dash=True)
-            return df_mkt[(df_mkt.date >= start) & (df_mkt.date <= end)]
-        else:
+        if start is not None and end is not None:
+            mkt_data = df_mkt[(df_mkt.date >= start) & (df_mkt.date <= end)]
+        elif start is not None and ndays is not None:
+            mkt_data = df_mkt[df_mkt.date >= start].head(ndays)
+        elif end is not None and ndays is not None:
+            mkt_data = df_mkt[df_mkt.date <= end].tail(ndays)
+        elif start is not None:
             if range_lookup:
                 mkt_data = df_mkt[df_mkt.date <= start].iloc[-1]
             else:
@@ -270,7 +286,18 @@ class Utils(object):
                     mkt_data = Series()
                 else:
                     mkt_data = mkt_data.iloc[0]
-            return mkt_data
+        elif end is not None:
+            if range_lookup:
+                mkt_data = df_mkt[df_mkt.date <= end].iloc[-1]
+            else:
+                mkt_data = df_mkt[df_mkt.date == end]
+                if mkt_data.shape[0] == 0:
+                    mkt_data = Series()
+                else:
+                    mkt_data = mkt_data.iloc[0]
+        else:
+            mkt_data = None
+        return mkt_data
 
     @classmethod
     def get_min_mkt(cls, code, trade_date, index=False, fq=False):

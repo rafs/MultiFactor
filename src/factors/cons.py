@@ -29,6 +29,13 @@ INTRADAYMOMENTUM_CT = DottableDict({'days_num': 20,                             
                                     'optimal_weight_file': 'Momentum/IntradayMomentum/optimal_weight.csv',  # 日内因子最优权重文件相对路径
                                     'backtest_path': 'FactorBackTest/IntradayMomentum'          # 历史回测结果文件的保存路径（相对于因子数据库根目录的相对路径）
                                     })
+# CYQ筹码分布因子的配置参数
+CYQ_CT = DottableDict({'days_num': 60,                                      # 计算因子载荷所需日K线行情的天数
+                       'db_file': 'Sentiment/CYQ/CYQ',                      # 筹码分布因子载荷的保存文件相对路径名
+                       'proxies_db_file': 'Sentiment/CYQ/CYQ_proxies',      # 筹码分布代理变量的保存文件相对路径名
+                       'proxies_weight_file': 'Sentiment/CYQ_weight',       # 筹码分布代理变量权重文件相对路径名
+                       'backtest_path': 'FactorTest/CYQ'                    # 历史回测结果文件的相对路径名
+                       })
 # 规模因子的配置参数
 SCALE_CT = DottableDict({'db_file': 'ElementaryFactor/Scale/Scale'})
 # 传统动量因子的配置参数

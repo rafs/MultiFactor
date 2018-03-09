@@ -162,40 +162,45 @@ class CYQ(Factor):
 
             trading_day = Utils.get_trading_days(calc_date, ndays=2)[1]
             # 采用单进程计算筹码因子分布的代理变量
-            for _, stock_info in stock_basics.iterrows():
-                cyq_proxies = cls._calc_factor_loading(stock_info.symbol, calc_date)
-                if cyq_proxies is not None:
-                    logging.info("[%s] %s's cyq proxies = (%0.4f,%0.4f,%0.4f,%0.4f,%0.4f)" % (calc_date.strftime('%Y-%m-%d'), stock_info.symbol, cyq_proxies['arc'], cyq_proxies['vrc'], cyq_proxies['src'], cyq_proxies['krc'], cyq_proxies['next_ret']))
-                    # cyq_proxies['date'] = trading_day
-                    cyq_proxies['id'] = Utils.code_to_symbol(stock_info.symbol)
-                    df_proxies = df_proxies.append(cyq_proxies, ignore_index=True)
+            # for _, stock_info in stock_basics.iterrows():
+            #     cyq_proxies = cls._calc_factor_loading(stock_info.symbol, calc_date)
+            #     if cyq_proxies is not None:
+            #         logging.info("[%s] %s's cyq proxies = (%0.4f,%0.4f,%0.4f,%0.4f,%0.4f)" % (calc_date.strftime('%Y-%m-%d'), stock_info.symbol, cyq_proxies['arc'], cyq_proxies['vrc'], cyq_proxies['src'], cyq_proxies['krc'], cyq_proxies['next_ret']))
+            #         # cyq_proxies['date'] = trading_day
+            #         cyq_proxies['id'] = Utils.code_to_symbol(stock_info.symbol)
+            #         df_proxies = df_proxies.append(cyq_proxies, ignore_index=True)
 
             # 采用多进程进行并行计算筹码分布因子的代理变量
-            # q = Manager().Queue()   # 队列, 用于进程间通信, 存储每个进程计算的因子载荷
-            # p = Pool(4)             # 进程池, 最多同时开启4个进程
-            # for _, stock_info in stock_basics.iterrows():
-            #     p.apply_async(cls._calc_factor_loading_proc, args=(stock_info.symbol, calc_date, q,))
-            # p.close()
-            # p.join()
-            # while not q.empty():
-            #     cyq_proxies = q.get(True)
-            #     cyq_proxies['date'] = trading_day
-            #     df_proxies.append(cyq_proxies, ignore_index=True)
+            q = Manager().Queue()   # 队列, 用于进程间通信, 存储每个进程计算的因子载荷
+            p = Pool(4)             # 进程池, 最多同时开启4个进程
+            for _, stock_info in stock_basics.iterrows():
+                p.apply_async(cls._calc_factor_loading_proc, args=(stock_info.symbol, calc_date, q,))
+            p.close()
+            p.join()
+            while not q.empty():
+                cyq_proxies = q.get(True)
+                # cyq_proxies['date'] = trading_day
+                df_proxies = df_proxies.append(cyq_proxies, ignore_index=True)
 
             # 保存筹码分布代理变量数据
             df_proxies['date'] = trading_day
             proxies_file_path = cls._db_proxies_path + '_%s.csv' % Utils.datetimelike_to_str(calc_date, dash=False)
             df_proxies.to_csv(proxies_file_path, index=False, columns=['date', 'id', 'arc', 'vrc', 'src', 'krc', 'next_ret'])
+
+            # 导入筹码分布因子的代理变量数据
+            # cyq_proxies_path = cls._db_proxies_path + '_%s.csv' % Utils.datetimelike_to_str(calc_date, dash=False)
+            # df_proxies = pd.read_csv(cyq_proxies_path, header=0)
+
             # 计算marc, 代理变量权重及筹码分布因子载荷
             marc = df_proxies['arc'].median()
-            proxies_weight_file = factor_ct.CYQ_CT.proxies_weight_file
-            if Path(proxies_weight_file).exists():
+            proxies_weight_file = Path(factor_ct.FACTOR_DB.db_path ,factor_ct.CYQ_CT.proxies_weight_file)
+            if proxies_weight_file.exists():
                 df_proxies_weight = pd.read_csv(proxies_weight_file, header=0, parse_dates=[0])
-                df_proxies_weight = df_proxies_weight[df_proxies_weight.date <= calc_date].tail(24)
+                df_proxies_weight = df_proxies_weight[df_proxies_weight.date < calc_date].tail(24)
                 if len(df_proxies_weight) < 24:
                     with open(proxies_weight_file, 'a', newline='') as f:
                         csv_writer = csv.writer(f)
-                        csv_writer.writerow([calc_date.strftime('%Y-%m-%d'), marc, 0, 0, 0, 0])
+                        csv_writer.writerow([calc_date.strftime('%Y-%m-%d'), marc, 0, 0, 0, 0, 0])
                 else:
                     df_proxies_data = DataFrame()
                     if marc > 0:
@@ -204,31 +209,33 @@ class CYQ(Factor):
                         df_proxies_weight = df_proxies_weight[df_proxies_weight.marc < 0]
                     for _, weight_info in df_proxies_weight.iterrows():
                         proxies_file_path = cls._db_proxies_path + '_%s.csv' % Utils.datetimelike_to_str(weight_info['date'], False)
-                        df_proxies_data.append(pd.read_csv(proxies_file_path, header=0), ignore_index=True)
+                        df_proxies_data = df_proxies_data.append(pd.read_csv(proxies_file_path, header=0), ignore_index=True)
                     next_ret = np.array(df_proxies_data['next_ret'])
                     cyq_data = np.array(df_proxies_data[['arc', 'vrc', 'src', 'krc']])
+                    cyq_data = sm.add_constant(cyq_data)
                     cyq_model = sm.OLS(next_ret, cyq_data)
                     cyq_result = cyq_model.fit()
-                    cyq_weights = cyq_result.params
+                    cyq_weights = np.around(cyq_result.params, 6)
                     with open(proxies_weight_file, 'a', newline='') as f:
                         csv_writer = csv.writer(f)
-                        csv_writer.writeroe([calc_date.strftime('%Y-%m-%d'), marc, cyq_weights[0], cyq_weights[1], cyq_weights[2], cyq_weights[3]])
+                        csv_writer.writerow([calc_date.strftime('%Y-%m-%d'), marc, cyq_weights[0], cyq_weights[1], cyq_weights[2], cyq_weights[3], cyq_weights[4]])
                     # 计算筹码分布因子载荷
                     arr_proxies = np.array(df_proxies[['arc', 'vrc', 'src', 'krc']])
-                    arr_weirght = np.array([cyq_weights[0], cyq_weights[1], cyq_weights[2], cyq_weights[3]]).reshape((4,1))
-                    arr_cyq = np.dot(arr_proxies, arr_weirght)
-                    dict_cyq = {'date': list(df_proxies['date']), 'id': list(df_proxies['id']), 'factorvalue': list(arr_cyq)}
+                    arr_weight = np.array([cyq_weights[1], cyq_weights[2], cyq_weights[3], cyq_weights[4]]).reshape((4,1))
+                    intercept = cyq_weights[0]
+                    arr_cyq = np.around(np.dot(arr_proxies, arr_weight)+intercept, 6)
+                    dict_cyq = {'date': list(df_proxies['date']), 'id': list(df_proxies['id']), 'factorvalue': list(arr_cyq.reshape((len(arr_cyq),)))}
                     # 保存因子载荷至因子数据库
                     if save:
-                        Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_cyq)
+                        Utils.factor_loading_persistent(cls._db_file, calc_date.strftime('%Y%m%d'), dict_cyq, columns=['date', 'id', 'factorvalue'])
             else:
                 with open(proxies_weight_file, 'w', newline='') as f:
                     csv_writer = csv.writer(f)
-                    csv_writer.writerow(['date', 'marc', 'arc_w', 'vrc_w', 'src_w', 'krc_w'])
-                    csv_writer.writerow([calc_date.strftime('%Y-%m-%d'), marc, 0, 0, 0, 0])
+                    csv_writer.writerow(['date', 'marc', 'intcpt', 'arc_w', 'vrc_w', 'src_w', 'krc_w'])
+                    csv_writer.writerow([calc_date.strftime('%Y-%m-%d'), marc, 0, 0, 0, 0, 0])
             # 休息300秒
-            logging.info('Suspending for 300s.')
-            time.sleep(300)
+            logging.info('Suspending for 200s.')
+            time.sleep(200)
 
 
 if __name__ == '__main__':

@@ -633,6 +633,47 @@ class Utils(object):
         return df_ind_classify
 
     @classmethod
+    def get_ipo_info(cls, code=None):
+        """
+        读取个股IPO信息数据
+        Parameters:
+        --------
+        :param code: str
+            个股代码, 如600000 or SH600000
+        :return: pd.DataFrame or pd.Series
+        --------
+        1. 成立日期
+        2. 上市日期
+        3. 发行方式
+        4. 面值
+        5. 发行数量
+        6. 发行价格
+        7. 募资资金总额
+        8. 发行费用
+        9. 发行中签率
+        10. 发行市盈率
+        11. 发行后每股收益
+        12. 发行后每股净资产
+        13. 上市首日开盘价
+        14. 上市首日收盘价
+        15. 上市首日换手率
+        16. 主承销商
+        17. 上市保荐人
+        18. 会计师事务所
+        19. 代码
+        """
+        ipo_info_path = os.path.join(ct.DB_PATH, ct.IPO_INFO_PATH, 'ipo_info.csv')
+        df_ipo_info = pd.read_csv(ipo_info_path, header=0)
+        if code is not None:
+            code = cls.code_to_symbol(code)
+            if code not in df_ipo_info[df_ipo_info['代码'] == code].values:
+                return None
+            else:
+                return df_ipo_info[df_ipo_info['代码'] == code]
+        else:
+            return df_ipo_info
+
+    @classmethod
     def trading_status(cls, code, trading_day):
         """
         返回个股在指定交易日的交易状态：正常、停牌、涨停、跌停
@@ -980,8 +1021,10 @@ if __name__ == '__main__':
     # mkt = Utils.get_secu_daily_mkt('600827', '2015-03-05', range_lookup=False)
     # print(mkt)
     # print(mkt.shape)
-    Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/IntradayMomentum')
+    # Utils.port_data_to_wind('/Volumes/DB/FactorDB/FactorBackTest/IntradayMomentum')
     # df = ts.get_industry_classified('sw')
     # print(df.head())
     # secu_ind_dist = Utils.get_ind_dist('600000')
     # print(secu_ind_dist)
+    ipo_info = Utils.get_ipo_info('600000')
+    print(ipo_info)

@@ -22,6 +22,8 @@ CAP_STRUCT = 'ElementaryFactor/cap_struct'
 FIN_BASIC_DATA_PATH = 'ElementaryFactor/fin_data/fin_data_basics'
 # 个股行业分类相对目录
 INDUSTRY_CLASSIFY_DATA_PATH = 'ElementaryFactor/industry_classify'
+# 个股IPO信息数据相对目录
+IPO_INFO_PATH = 'ElementaryFactor/ipo_info'
 
 # 日行情复权数据的表头
 MKT_DAILY_FQ_HEADER = ['code', 'date', 'open', 'high', 'low', 'close', 'vol', 'amount', 'turnover1', 'turnover2', 'factor']

@@ -35,5 +35,8 @@ class Cache(object):
     def size(self):
         return len(self.cache)
 
+    def set_maxsize(self, max_size):
+        self.maxsize = max_size
+
 if __name__ == '__main__':
     pass

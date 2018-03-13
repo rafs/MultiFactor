@@ -241,7 +241,8 @@ class Utils(object):
             1. 指定开始、结束日期, 即start和end不为None, 此时忽略ndays, 返回pd.DataFrame
             2. 指定开始日期和天数, 即start和ndays不为None、而end为None, 返回pd.DataFrame
             3. 指定结束日期和天数, 即end和ndays不为None、而start为None, 返回pd.DataFrame
-            4. 仅指定开始日期, 即start不为None、而end和ndays为None, 返回pd.Series
+            4. 仅指定开始日期, 即start不为None、而end和ndays为None, 返回pd.Series, 返回start当天或之前最新的行情(根据range_lookup参数确定)
+            5. 仅指定结束日期, 即end不为None、而start和ndays为None, 返回pd.DataFrame, 从上市日到end的日行情数据
             code    证券代码
             date    日期
             open    开盘价
@@ -287,14 +288,15 @@ class Utils(object):
                 else:
                     mkt_data = mkt_data.iloc[0]
         elif end is not None:
-            if range_lookup:
-                mkt_data = df_mkt[df_mkt.date <= end].iloc[-1]
-            else:
-                mkt_data = df_mkt[df_mkt.date == end]
-                if mkt_data.shape[0] == 0:
-                    mkt_data = Series()
-                else:
-                    mkt_data = mkt_data.iloc[0]
+            # if range_lookup:
+            #     mkt_data = df_mkt[df_mkt.date <= end].iloc[-1]
+            # else:
+            #     mkt_data = df_mkt[df_mkt.date == end]
+            #     if mkt_data.shape[0] == 0:
+            #         mkt_data = Series()
+            #     else:
+            #         mkt_data = mkt_data.iloc[0]
+            mkt_data = df_mkt[df_mkt.date <= end]
         else:
             mkt_data = None
         return mkt_data
@@ -669,7 +671,7 @@ class Utils(object):
             if code not in df_ipo_info[df_ipo_info['代码'] == code].values:
                 return None
             else:
-                return df_ipo_info[df_ipo_info['代码'] == code]
+                return df_ipo_info[df_ipo_info['代码'] == code].iloc[0]
         else:
             return df_ipo_info
 

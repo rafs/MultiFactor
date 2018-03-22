@@ -27,6 +27,7 @@ import time
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
 
+
 class CYQ(Factor):
     """筹码分布因子类"""
     # __days = factor_ct.CYQ_CT.days_num      # 读取过去多少天的日K线行情数据进行因子载荷计算
@@ -398,5 +399,5 @@ class CYQ(Factor):
 
 if __name__ == '__main__':
     # pass
-    CYQ.calc_factor_loading(start_date='2008-1-1', end_date='2008-12-31', month_end=True, save=True)
+    CYQ.calc_factor_loading(start_date='2017-5-1', end_date='2017-12-31', month_end=True, save=True)
     # CYQ._calc_factor_loading('000722', '2006-12-29')

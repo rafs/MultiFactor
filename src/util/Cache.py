@@ -16,7 +16,7 @@ class Cache(object):
 
     def get(self, key):
         try:
-            item = self.cache[key]  # KeyErroe if not present
+            item = self.cache[key]  # KeyError if not present
             self.order.remove(key)
             self.order.append(key)
         except KeyError:

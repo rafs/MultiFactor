@@ -82,7 +82,7 @@ class BETA(Factor):
         result = cap_model.fit()
         beta = result.params[1]
         hsigma = np.sqrt(result.mse_resid)
-        return pd.Series([code, beta, hsigma], index=['code', 'beta', 'hsigma'])
+        return pd.Series([Utils.code_to_symbol(code), beta, hsigma], index=['code', 'beta', 'hsigma'])
 
     @classmethod
     def _calc_factor_loading_proc(cls, code, calc_date, q):

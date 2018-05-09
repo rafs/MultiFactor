@@ -65,7 +65,7 @@ class DASTD(Factor):
         weights = np.float_power(x, time_spans) * y
         # 计算个股DASTD因子值
         dastd = np.sqrt(np.sum((arr_secu_daily_ret - avg_daily_ret) ** 2 * weights))
-        return pd.Series([code, dastd], index=['code', 'dastd'])
+        return pd.Series([Utils.code_to_symbol(code), dastd], index=['code', 'dastd'])
 
     @classmethod
     def _calc_factor_loading_proc(cls, code, calc_date, q):
@@ -182,12 +182,12 @@ class CMRA(Factor):
             如果计算失败, 返回None
         """
         # 取得个股日复权行情数据
-        df_secu_quote = Utils.get_secu_daily_mkt(code, end=calc_date,ndays=risk_ct.CMRA_CT.trailing*risk_ct.CMRA_CT.days_scale+1, fq=True)
-        if df_secu_quote is None:
-            return None
-        if len(df_secu_quote) < risk_ct.CMRA_CT.listed_days:
-            return None
-        df_secu_quote.reset_index(drop=True, inplace=True)
+        # df_secu_quote = Utils.get_secu_daily_mkt(code, end=calc_date,ndays=risk_ct.CMRA_CT.trailing*risk_ct.CMRA_CT.days_scale+1, fq=True)
+        # if df_secu_quote is None:
+        #     return None
+        # if len(df_secu_quote) < risk_ct.CMRA_CT.listed_days:
+        #     return None
+        # df_secu_quote.reset_index(drop=True, inplace=True)
         # 计算个股的日对数收益率序列
         # arr_secu_close = np.array(df_secu_quote.iloc[1:]['close'])
         # arr_secu_preclose = np.array(df_secu_quote.shift(1).iloc[1:]['close'])
@@ -204,17 +204,49 @@ class CMRA(Factor):
         #         z.append(np.sum(arr_secu_daily_ret[:k]))
 
         # 计算每个月的个股价格变化率(1+r)
+        # z = []
+        # for t in range(1, risk_ct.CMRA_CT.trailing+1):
+        #     k = t * risk_ct.CMRA_CT.days_scale
+        #     if k > len(df_secu_quote)-1:
+        #         k = len(df_secu_quote)-1
+        #         z.append(df_secu_quote.iloc[k]['close']/df_secu_quote.iloc[0]['close'])
+        #         break
+        #     else:
+        #         z.append(df_secu_quote.iloc[k]['close']/df_secu_quote.iloc[0]['close'])
+        # cmra = np.log(max(z)) - np.log(min(z))
+
+
+
+        # 取得交易日序列
+        trading_days = Utils.get_trading_days(end=calc_date, ndays=risk_ct.CMRA_CT.trailing*risk_ct.CMRA_CT.days_scale+1)
+        trading_days = [day.strftime('%Y-%m-%d') for day in trading_days]
+        # 取得个股复权行情数据
+        df_secu_quote = Utils.get_secu_daily_mkt(code, end=calc_date, fq=True)
+        # 提取相应交易日的个股复权行情数据
+        df_secu_quote = df_secu_quote[df_secu_quote['date'].isin(trading_days)]
+        df_secu_quote.reset_index(drop=True, inplace=True)
+        # 计算个股每个月的个股价格变化率
         z = []
-        for t in range(1, risk_ct.CMRA_CT.trailing+1):
-            k = t * risk_ct.CMRA_CT.days_scale
-            if k > len(df_secu_quote)-1:
-                k = len(df_secu_quote)-1
-                z.append(df_secu_quote.iloc[k]['close']/df_secu_quote.iloc[0]['close'])
-                break
-            else:
-                z.append(df_secu_quote.iloc[k]['close']/df_secu_quote.iloc[0]['close'])
-        cmra = np.log(max(z)) - np.log(min(z))
-        return pd.Series([code, cmra], index=['code', 'cmra'])
+        if len(df_secu_quote) < risk_ct.CMRA_CT.trailing*risk_ct.CMRA_CT.days_scale/2:
+            # 如果提取的个股复权行情长度小于所需时间长度的一般(126个交易日), 返回None
+            return None
+        else:
+            prev_trading_day = df_secu_quote.iloc[0]['date']
+            for t in range(1, risk_ct.CMRA_CT.trailing+1):
+                k = t * risk_ct.CMRA_CT.days_scale
+                trading_day = trading_days[k]
+                try:
+                    secu_trading_day = df_secu_quote[df_secu_quote['date'] <= trading_day].iloc[-1]['date']
+                    if secu_trading_day <= prev_trading_day:
+                        continue
+                    else:
+                        ret = df_secu_quote[df_secu_quote['date']==secu_trading_day].iloc[0]['close']/df_secu_quote.iloc[0]['close']
+                        z.append(ret)
+                        prev_trading_day = secu_trading_day
+                except Exception as e:
+                    print(e)
+            cmra = np.log(max(z)) - np.log(min(z))
+        return pd.Series([Utils.code_to_symbol(code), cmra], index=['code', 'cmra'])
 
     @classmethod
     def _calc_factor_loading_proc(cls, code, calc_date, q):
@@ -313,5 +345,5 @@ class CMRA(Factor):
 if __name__ == '__main__':
     pass
     # DASTD.calc_factor_loading(start_date='2017-12-29', end_date=None, month_end=False, save=True, multi_proc=True)
-    CMRA.calc_factor_loading(start_date='2017-12-29', end_date=None, month_end=False, save=True, multi_proc=False)
+    CMRA.calc_factor_loading(start_date='2017-12-29', end_date=None, month_end=False, save=True, multi_proc=True)
     # CMRA.calc_secu_factor_loading(code='002129', calc_date='2017-12-29')

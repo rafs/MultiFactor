@@ -7,6 +7,9 @@
 
 from src.util.dottabledict import DottableDict
 
+# 基准代码, 用于因子载荷计算中日期序列提取等
+BENCHMARK_CODE = 'SH000001'
+
 # SmartMoney因子的配置参数
 SMARTMONEY_CT = DottableDict({'days_num': 10,                               # 计算因子载荷所需分钟行情的天数
                               'db_file': 'Sentiment/SmartQ',                # 因子载荷的保存文件路径名（相对于因子数据库根目录的相对路径）
